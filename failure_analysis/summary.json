@@ -1,0 +1,505 @@
+{
+  "total_images_analyzed": 1002,
+  "global_mean_confidence": 0.649992,
+  "global_uncertain_pct": 33.99,
+  "global_top_confused_pairs": [
+    {
+      "pair": "Ground Clutter <-> Landscape",
+      "total_confused_pixels": 15674660
+    },
+    {
+      "pair": "Dry Grass <-> Landscape",
+      "total_confused_pixels": 12170903
+    },
+    {
+      "pair": "Dry Grass <-> Ground Clutter",
+      "total_confused_pixels": 7184182
+    },
+    {
+      "pair": "Dry Bushes <-> Landscape",
+      "total_confused_pixels": 217590
+    },
+    {
+      "pair": "Lush Bushes <-> Dry Bushes",
+      "total_confused_pixels": 85384
+    }
+  ],
+  "failure_patterns": {
+    "high_uncertainty_images": 158,
+    "low_confidence_images": 0,
+    "moderate_difficulty": 471,
+    "well_predicted": 531
+  },
+  "hardest_images": [
+    {
+      "rank": 1,
+      "filename": "0000598.png",
+      "difficulty_score": 0.429945,
+      "mean_conf": 0.58806,
+      "uncertain_pct": 52.71,
+      "confused_pairs": [
+        {
+          "class_a": "Ground Clutter",
+          "class_b": "Landscape",
+          "confused_pixels": 16834
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 13739
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Landscape",
+          "confused_pixels": 12149
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 7974
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 5939
+        }
+      ],
+      "pred_distribution": {
+        "Trees": 0.22,
+        "Lush Bushes": 16.17,
+        "Dry Grass": 25.0,
+        "Dry Bushes": 0.9,
+        "Ground Clutter": 25.25,
+        "Flowers": 0.0,
+        "Logs": 0.0,
+        "Rocks": 0.93,
+        "Landscape": 26.01,
+        "Sky": 5.5
+      },
+      "output_dir": "runs/failure_analysis/rank_01_0000598"
+    },
+    {
+      "rank": 2,
+      "filename": "0000890.png",
+      "difficulty_score": 0.430357,
+      "mean_conf": 0.582227,
+      "uncertain_pct": 50.62,
+      "confused_pairs": [
+        {
+          "class_a": "Ground Clutter",
+          "class_b": "Landscape",
+          "confused_pixels": 15602
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 10572
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 10393
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Dry Bushes",
+          "confused_pixels": 8815
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Landscape",
+          "confused_pixels": 8568
+        }
+      ],
+      "pred_distribution": {
+        "Trees": 0.71,
+        "Lush Bushes": 12.76,
+        "Dry Grass": 17.2,
+        "Dry Bushes": 8.03,
+        "Ground Clutter": 20.45,
+        "Flowers": 0.02,
+        "Logs": 0.0,
+        "Rocks": 0.14,
+        "Landscape": 23.46,
+        "Sky": 17.22
+      },
+      "output_dir": "runs/failure_analysis/rank_02_0000890"
+    },
+    {
+      "rank": 3,
+      "filename": "0001012.png",
+      "difficulty_score": 0.440639,
+      "mean_conf": 0.587151,
+      "uncertain_pct": 48.84,
+      "confused_pairs": [
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Landscape",
+          "confused_pixels": 11987
+        },
+        {
+          "class_a": "Ground Clutter",
+          "class_b": "Landscape",
+          "confused_pixels": 11151
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Dry Bushes",
+          "confused_pixels": 9500
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 6029
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 5880
+        }
+      ],
+      "pred_distribution": {
+        "Trees": 0.16,
+        "Lush Bushes": 4.56,
+        "Dry Grass": 22.49,
+        "Dry Bushes": 20.38,
+        "Ground Clutter": 13.41,
+        "Flowers": 0.0,
+        "Logs": 0.05,
+        "Rocks": 0.69,
+        "Landscape": 18.15,
+        "Sky": 20.11
+      },
+      "output_dir": "runs/failure_analysis/rank_03_0001012"
+    },
+    {
+      "rank": 4,
+      "filename": "0001013.png",
+      "difficulty_score": 0.450316,
+      "mean_conf": 0.591938,
+      "uncertain_pct": 47.21,
+      "confused_pairs": [
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Dry Bushes",
+          "confused_pixels": 16442
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Landscape",
+          "confused_pixels": 14596
+        },
+        {
+          "class_a": "Ground Clutter",
+          "class_b": "Landscape",
+          "confused_pixels": 8632
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 6461
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 3327
+        }
+      ],
+      "pred_distribution": {
+        "Trees": 0.18,
+        "Lush Bushes": 20.57,
+        "Dry Grass": 26.14,
+        "Dry Bushes": 5.41,
+        "Ground Clutter": 11.74,
+        "Flowers": 0.0,
+        "Logs": 0.0,
+        "Rocks": 1.37,
+        "Landscape": 14.96,
+        "Sky": 19.63
+      },
+      "output_dir": "runs/failure_analysis/rank_04_0001013"
+    },
+    {
+      "rank": 5,
+      "filename": "0000313.png",
+      "difficulty_score": 0.453954,
+      "mean_conf": 0.596932,
+      "uncertain_pct": 47.66,
+      "confused_pairs": [
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Landscape",
+          "confused_pixels": 23591
+        },
+        {
+          "class_a": "Ground Clutter",
+          "class_b": "Landscape",
+          "confused_pixels": 9797
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 6673
+        },
+        {
+          "class_a": "Dry Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 6172
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 2151
+        }
+      ],
+      "pred_distribution": {
+        "Trees": 0.0,
+        "Lush Bushes": 1.9,
+        "Dry Grass": 30.01,
+        "Dry Bushes": 7.16,
+        "Ground Clutter": 15.39,
+        "Flowers": 0.0,
+        "Logs": 0.0,
+        "Rocks": 0.66,
+        "Landscape": 27.9,
+        "Sky": 16.98
+      },
+      "output_dir": "runs/failure_analysis/rank_05_0000313"
+    },
+    {
+      "rank": 6,
+      "filename": "0000599.png",
+      "difficulty_score": 0.459639,
+      "mean_conf": 0.60585,
+      "uncertain_pct": 48.74,
+      "confused_pairs": [
+        {
+          "class_a": "Ground Clutter",
+          "class_b": "Landscape",
+          "confused_pixels": 24665
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Landscape",
+          "confused_pixels": 15174
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 9449
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 5141
+        },
+        {
+          "class_a": "Dry Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 1300
+        }
+      ],
+      "pred_distribution": {
+        "Trees": 0.18,
+        "Lush Bushes": 2.39,
+        "Dry Grass": 26.39,
+        "Dry Bushes": 1.35,
+        "Ground Clutter": 30.0,
+        "Flowers": 0.0,
+        "Logs": 0.0,
+        "Rocks": 0.3,
+        "Landscape": 33.88,
+        "Sky": 5.5
+      },
+      "output_dir": "runs/failure_analysis/rank_06_0000599"
+    },
+    {
+      "rank": 7,
+      "filename": "0000311.png",
+      "difficulty_score": 0.459917,
+      "mean_conf": 0.601364,
+      "uncertain_pct": 47.15,
+      "confused_pairs": [
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Landscape",
+          "confused_pixels": 23610
+        },
+        {
+          "class_a": "Ground Clutter",
+          "class_b": "Landscape",
+          "confused_pixels": 11141
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 10601
+        },
+        {
+          "class_a": "Dry Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 6454
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Dry Bushes",
+          "confused_pixels": 1728
+        }
+      ],
+      "pred_distribution": {
+        "Trees": 0.0,
+        "Lush Bushes": 0.2,
+        "Dry Grass": 35.56,
+        "Dry Bushes": 3.45,
+        "Ground Clutter": 17.81,
+        "Flowers": 0.0,
+        "Logs": 0.0,
+        "Rocks": 0.54,
+        "Landscape": 26.11,
+        "Sky": 16.33
+      },
+      "output_dir": "runs/failure_analysis/rank_07_0000311"
+    },
+    {
+      "rank": 8,
+      "filename": "0000062.png",
+      "difficulty_score": 0.460339,
+      "mean_conf": 0.602803,
+      "uncertain_pct": 47.49,
+      "confused_pairs": [
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Landscape",
+          "confused_pixels": 26286
+        },
+        {
+          "class_a": "Ground Clutter",
+          "class_b": "Landscape",
+          "confused_pixels": 14108
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 9142
+        },
+        {
+          "class_a": "Dry Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 3341
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 1451
+        }
+      ],
+      "pred_distribution": {
+        "Trees": 0.28,
+        "Lush Bushes": 0.71,
+        "Dry Grass": 33.59,
+        "Dry Bushes": 3.22,
+        "Ground Clutter": 18.11,
+        "Flowers": 0.0,
+        "Logs": 0.0,
+        "Rocks": 1.07,
+        "Landscape": 27.81,
+        "Sky": 15.21
+      },
+      "output_dir": "runs/failure_analysis/rank_08_0000062"
+    },
+    {
+      "rank": 9,
+      "filename": "0000312.png",
+      "difficulty_score": 0.46071,
+      "mean_conf": 0.601411,
+      "uncertain_pct": 46.9,
+      "confused_pairs": [
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Landscape",
+          "confused_pixels": 25042
+        },
+        {
+          "class_a": "Ground Clutter",
+          "class_b": "Landscape",
+          "confused_pixels": 10028
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 8541
+        },
+        {
+          "class_a": "Dry Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 6737
+        },
+        {
+          "class_a": "Dry Bushes",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 2832
+        }
+      ],
+      "pred_distribution": {
+        "Trees": 0.0,
+        "Lush Bushes": 0.19,
+        "Dry Grass": 32.45,
+        "Dry Bushes": 4.66,
+        "Ground Clutter": 16.93,
+        "Flowers": 0.0,
+        "Logs": 0.0,
+        "Rocks": 0.9,
+        "Landscape": 28.15,
+        "Sky": 16.71
+      },
+      "output_dir": "runs/failure_analysis/rank_09_0000312"
+    },
+    {
+      "rank": 10,
+      "filename": "0000891.png",
+      "difficulty_score": 0.461352,
+      "mean_conf": 0.60042,
+      "uncertain_pct": 46.36,
+      "confused_pairs": [
+        {
+          "class_a": "Ground Clutter",
+          "class_b": "Landscape",
+          "confused_pixels": 18180
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Landscape",
+          "confused_pixels": 11189
+        },
+        {
+          "class_a": "Dry Grass",
+          "class_b": "Ground Clutter",
+          "confused_pixels": 10856
+        },
+        {
+          "class_a": "Lush Bushes",
+          "class_b": "Dry Bushes",
+          "confused_pixels": 9049
+        },
+        {
+          "class_a": "Dry Bushes",
+          "class_b": "Landscape",
+          "confused_pixels": 3658
+        }
+      ],
+      "pred_distribution": {
+        "Trees": 0.67,
+        "Lush Bushes": 5.8,
+        "Dry Grass": 18.67,
+        "Dry Bushes": 7.63,
+        "Ground Clutter": 23.21,
+        "Flowers": 0.0,
+        "Logs": 0.0,
+        "Rocks": 0.17,
+        "Landscape": 26.78,
+        "Sky": 17.07
+      },
+      "output_dir": "runs/failure_analysis/rank_10_0000891"
+    }
+  ]
+}

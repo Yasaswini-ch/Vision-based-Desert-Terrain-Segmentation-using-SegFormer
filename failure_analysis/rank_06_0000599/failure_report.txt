@@ -1,0 +1,41 @@
+FAILURE ANALYSIS REPORT
+==================================================
+Image: 0000599.png
+
+METRICS
+  Mean prediction confidence : 0.6059  (60.6%)
+  Uncertain pixels (conf<0.6) : 48.7%
+
+WHY THE MODEL STRUGGLED HERE
+  - Very high proportion of uncertain regions (>40%), suggesting
+    the scene contains visual patterns poorly represented in training.
+
+CONFUSED CLASS PAIRS (top confusions)
+  - Ground Clutter     <-> Landscape          : 24,665 pixels
+  - Dry Grass          <-> Landscape          : 15,174 pixels
+  - Dry Grass          <-> Ground Clutter     : 9,449 pixels
+  - Lush Bushes        <-> Landscape          : 5,141 pixels
+  - Dry Bushes         <-> Landscape          : 1,300 pixels
+
+  Primary confusion: Ground Clutter vs Landscape
+  (Ground clutter overlaps visually with rocks and dry bushes.)
+  (Open landscape can resemble dry grass at distance.)
+
+PREDICTED CLASS DISTRIBUTION (top 5)
+  Landscape           :  33.9%  ################
+  Ground Clutter      :  30.0%  ###############
+  Dry Grass           :  26.4%  #############
+  Sky                 :   5.5%  ##
+  Lush Bushes         :   2.4%  #
+
+SUGGESTED FIX
+  1. Collect more training samples that show Ground Clutter and Landscape under
+     similar lighting and texture conditions to improve discrimination.
+  2. Apply stronger colour-jitter and brightness augmentation so the
+     model learns shape and texture cues rather than colour alone.
+  3. Add test-time augmentation (TTA) or CRF post-processing to
+     sharpen predictions in high-uncertainty regions.
+  4. Review per-class loss weights — underrepresented or confused classes
+     may need higher weight to receive stronger training signal.
+  5. Consider adding hard-example mining so the training loop focuses
+     more epochs on scenes similar to this one.
