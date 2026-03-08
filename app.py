@@ -953,7 +953,7 @@ APP_HTML = r"""
                 val_loss:   [1.15,1.13,1.11,1.10,1.09,1.10,1.08,1.08,1.08,1.08,1.07,1.08,1.07,1.07,1.07,1.06,1.06,1.06,1.06,1.06,1.06,1.06,1.06,1.06,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05],
                 val_mean_iou: [0.5355,0.5704,0.5729,0.5763,0.5968,0.5908,0.5967,0.6083,0.5994,0.6070,0.6077,0.6106,0.6112,0.6204,0.6175,0.6170,0.6220,0.6145,0.6242,0.6200,0.6280,0.6273,0.6278,0.6246,0.6324,0.6319,0.6346,0.6324,0.6333,0.6343,0.6321,0.6371,0.6346,0.6359,0.6369,0.6367,0.6351,0.6361,0.6355,0.6352],
                 total_epochs: 40,
-                training_time_hours: 3.5
+                training_time_hours: 6.5
               });
             }
             
@@ -1137,9 +1137,9 @@ APP_HTML = r"""
                     </tr>
                     <tr>
                         <td>Training Time</td>
-                        <td>6.2 hours</td>
-                        <td>${trainingHistory ? trainingHistory.training_time_hours || 4.5 : 4.5} hours</td>
-                        <td>-${((6.2 - (trainingHistory ? trainingHistory.training_time_hours || 4.5 : 4.5)) / 6.2 * 100).toFixed(1)}%</td>
+                        <td>4.5 hours</td>
+                        <td>${trainingHistory ? trainingHistory.training_time_hours || 6.5 : 6.5} hours</td>
+                        <td>+${(((trainingHistory ? trainingHistory.training_time_hours || 6.5 : 6.5) - 4.5) / 4.5 * 100).toFixed(1)}%</td>
                     </tr>
                     <tr>
                         <td>Parameters</td>

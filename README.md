@@ -469,6 +469,17 @@ pip install pre-commit black isort flake8 pytest
 ```
 
 ### 🧪 **Testing**
+
+Or follow the manual Kaggle guide: [README_KAGGLE.md](README_KAGGLE.md)
+
+**Expected Results on Kaggle:**
+- Model: SegFormer B2 (50 epochs)
+- Expected mIoU: **0.68 – 0.75**
+- Training time: **1 – 2 hours** (vs 6+ hours on laptop)
+- Output: Best checkpoint + evaluation results
+
+## 8. Launch Beautiful Inference UI (Optional)
+
 ```bash
 # Run all tests
 pytest
