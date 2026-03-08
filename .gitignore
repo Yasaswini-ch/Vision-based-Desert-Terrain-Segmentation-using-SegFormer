@@ -71,7 +71,7 @@ runs/checkpoints/*.pth
 runs/predictions/*.png
 runs/uncertainty/*.png
 runs/densecrf/*.png
-runs/failure_analysis/
+# runs/failure_analysis/  # Removed - we want to include failure analysis results
 runs/logs/*.png
 
 # Dataset directories (too large for Git)
