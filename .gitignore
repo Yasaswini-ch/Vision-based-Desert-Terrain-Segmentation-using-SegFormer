@@ -21,6 +21,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# AI assistants
+.claude/
+
 # Large datasets (comment out if you want to include)
 Offroad_Segmentation_Training_Dataset/
 Offroad_Segmentation_testImages/
@@ -40,6 +43,11 @@ segmentation_project/runs/failure_analysis/
 *.tmp
 *.temp
 *.log
+
+# Archives and backups
+*.zip
+*.tar.gz
+*.rar
 
 # Jupyter
 .ipynb_checkpoints/
