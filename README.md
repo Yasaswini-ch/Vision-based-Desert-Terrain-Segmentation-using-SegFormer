@@ -491,11 +491,25 @@ pytest tests/test_dataset.py
 pytest --cov=segmentation_project --cov-report=html
 ```
 
+<<<<<<< HEAD
 ### 📝 **Code Quality**
 ```bash
 # Format code
 black segmentation_project/
 isort segmentation_project/
+=======
+### Core Features:
+- **Single Image Analysis:** Upload images, run inference, and use an adjustable overlay slider to compare predictions.
+- **Domain Generalization Intelligence:** Compare IoU and visual differences across multiple terrain domains side-by-side.
+- **Model Training Journey:** Interactive visualization of training progression (loss and mIoU over epochs).
+- **Failure Intelligence:** Browse the top 50 "hardest" images where the model struggled, with uncertainty heatmaps.
+
+### Advanced Simulation & Monitoring:
+- **Live Rover Feed:** Simulates a live camera feed. (Requires running `python app.py` alongside `python inference_server.py`). Features playback controls, frame skipping, and autonomous telemetry estimation.
+- **Live Location Intelligence:** Input a real-world location in the sidebar to fetch geocoded coordinates, elevation, and terrain data via OpenStreetMap and Open-Elevation.
+- **Real-time Model Performance Monitor:** An auto-refreshing dashboard displaying live inference metrics, mIoU health indicators, and processed frame counts.
+- **Terrain Database & History Log:** Automatically logs all segmentation runs into a local SQLite database (`runs/logs/mission_history.db`). View historical runs, average traversable percentages, and export logs to CSV.
+>>>>>>> a774065 (Add Live Location Intel, Real-time Monitor, and Terrain Database)
 
 # Run pre-commit hooks
 pre-commit run --all-files

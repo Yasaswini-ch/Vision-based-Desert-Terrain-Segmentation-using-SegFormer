@@ -14,3 +14,14 @@ transformers==4.46.3
 reportlab==3.6.13
 flask==3.0.0
 werkzeug==3.0.0
+fastapi
+uvicorn[standard]
+websockets
+python-multipart
+aiofiles
+httpx
+python-dotenv
+requests
+supabase
+qrcode[pil]
+flask-cors
