@@ -234,6 +234,36 @@ streamlit run segmentation_project/app.py
 python segmentation_project/report_generator.py
 ```
 
+### Advanced Simulation & Monitoring
+
+- **Live Rover Feed:** Simulates a live camera feed. (Requires running `python app.py` alongside `python inference.py`). Features playback controls, frame skipping, and autonomous telemetry estimation.
+
+> [!IMPORTANT]
+> 🚨 **Live Rover Intelligence System Setup**
+>
+> To enable the **Live Rover Feed**, the inference backend must be running before launching the UI.
+>
+> **Steps to run the system:**
+>
+> 1. Start the inference service:
+> ```bash
+> python inference.py
+> ```
+> *(or your project's inference server entrypoint)*
+>
+> 2. Launch the dashboard:
+> ```bash
+> streamlit run segmentation_project/app.py
+> ```
+>
+> 3. When your browser prompts for **camera access**, you **must click "Allow"**.
+>
+> ✅ This permission enables the **Live Rover Intelligence System** to stream frames into the segmentation model for **real-time terrain analysis and navigation safety mapping**.
+
+- **Live Location Intelligence:** Input a real-world location in the sidebar to fetch geocoded coordinates, elevation, and terrain data via OpenStreetMap and Open-Elevation.  
+- **Real-time Model Performance Monitor:** Auto-refreshing dashboard displaying live inference metrics, mIoU health indicators, and processed frame counts.  
+- **Terrain Database & History Log:** Automatically logs segmentation runs into a local SQLite database (`runs/logs/mission_history.db`). Historical runs, traversable statistics, and CSV export supported.
+
 ---
 
 ## 🛠️ **Technical Architecture**
