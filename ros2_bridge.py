@@ -27,7 +27,7 @@ class DesertRoverBridge(Node if ROS2_AVAILABLE else object):
         super().__init__('desert_rover_bridge')
         
         # Parameters
-        self.declare_parameter('api_url', 'http://localhost:8000/segment')
+        self.declare_parameter('api_url', 'http://localhost:5001/segment')
         self.api_url = self.get_parameter('api_url').get_parameter_value().string_value
         
         # Subscriptions

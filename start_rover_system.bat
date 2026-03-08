@@ -29,7 +29,7 @@ echo ========================================================
 echo   ✅ SYSTEM INITIALIZED
 echo ========================================================
 echo.
-echo   1. Inference Server: http://localhost:8000
+echo   1. Inference Server: http://localhost:5001
 echo   2. Monitor UI:        Automatic (Check browser)
 echo.
 echo   To test the system, choose an option:

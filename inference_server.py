@@ -414,5 +414,5 @@ if __name__ == "__main__":
     ws_thread.start()
     
     # Start Flask
-    print("Inference Server (Flask) starting on http://0.0.0.0:8000...")
-    app.run(host='0.0.0.0', port=8000, threaded=True)
+    print("Inference Server (Flask) starting on http://0.0.0.0:5001...")
+    app.run(host='0.0.0.0', port=5001, threaded=True)

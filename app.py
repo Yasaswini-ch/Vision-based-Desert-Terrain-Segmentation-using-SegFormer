@@ -169,6 +169,13 @@ APP_HTML = r"""
         const t = clamp(c, 0, 1);
         return [Math.round(128 + (1 - t) * 127), Math.round(40 + t * 210), Math.round(180 - t * 150)];
       };
+      const deg2num = (latDeg, lonDeg, zoom) => {
+        const latRad = latDeg * Math.PI / 180;
+        const n = Math.pow(2, zoom);
+        const xtile = Math.floor((lonDeg + 180.0) / 360.0 * n);
+        const ytile = Math.floor((1.0 - Math.asinh(Math.tan(latRad)) / Math.PI) / 2.0 * n);
+        return [xtile, ytile];
+      };
 
       function classifyPixel(r, g, b, xN, yN) {
         const brightness = (r + g + b) / 3;
@@ -717,15 +724,73 @@ APP_HTML = r"""
         const [locLoading, setLocLoading] = useState(false);
         const [locError, setLocError] = useState(null);
 
-        // FIX 2: port was 8000, Flask runs on 5001
-        const handleLocationSearch = () => {
+        const getBackendCandidates = () => {
+          const hosts = [window.location.hostname, "127.0.0.1", "localhost"].filter(Boolean);
+          return [...new Set(hosts)].map(h => `http://${h}:5001`);
+        };
+
+        const fetchWithBackendFallback = async (path, options) => {
+          const tried = [];
+          for (const base of getBackendCandidates()) {
+            const url = `${base}${path}`;
+            tried.push(url);
+            try {
+              const res = await fetch(url, options);
+              return res;
+            } catch (_) {
+              // Try the next backend candidate
+            }
+          }
+          throw new Error(`Connection failed for: ${tried.join(", ")}`);
+        };
+
+        const fetchLocationDirect = async (query) => {
+          const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
+          const geoRes = await fetch(geocodeUrl);
+          const geo = await geoRes.json();
+          const first = geo?.results?.[0];
+          if (!first) {
+            return { error: "Location not found" };
+          }
+
+          const lat = Number(first.latitude);
+          const lon = Number(first.longitude);
+          const elevUrl = `https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`;
+          const elevRes = await fetch(elevUrl);
+          const elev = await elevRes.json();
+          const elevation = Number(elev?.elevation?.[0] ?? 0);
+          const [xtile, ytile] = deg2num(lat, lon, 12);
+
+          return {
+            data: {
+              lat,
+              lon,
+              name: [first.name, first.admin1, first.country].filter(Boolean).join(", "),
+              elevation,
+              type: first.feature_code || "location",
+              xtile,
+              ytile
+            }
+          };
+        };
+
+        // Streamlit-safe location search: no localhost dependency for deployed users.
+        const handleLocationSearch = async () => {
           if (!locInput.trim()) return;
           setLocLoading(true); setLocError(null); setLocData(null);
-          const host = window.location.hostname || "127.0.0.1";
-          fetch(`http://${host}:5001/api/location?q=${encodeURIComponent(locInput)}`)
-            .then(r => r.json())
-            .then(d => { setLocLoading(false); if(d.error) setLocError(d.error); else setLocData(d.data); })
-            .catch(e => { setLocLoading(false); setLocError("Connection failed. Make sure the app server is running on port 5001."); });
+          try {
+            let d = await fetchLocationDirect(locInput);
+            if (d?.error) {
+              const r = await fetchWithBackendFallback(`/api/location?q=${encodeURIComponent(locInput)}`);
+              d = await r.json();
+            }
+            setLocLoading(false);
+            if (d.error) setLocError(d.error);
+            else setLocData(d.data);
+          } catch (_) {
+            setLocLoading(false);
+            setLocError("Connection failed. Please try again.");
+          }
         };
 
         // WebSocket for Live Rover Feed
@@ -754,12 +819,11 @@ APP_HTML = r"""
 
         useEffect(() => {
           if (activeTab === "rover") {
-            const host = window.location.hostname || "127.0.0.1";
-            fetch(`http://${host}:5001/start_simulator`)
+            fetchWithBackendFallback(`/start_simulator`)
               .catch(err => console.log("Failed to start simulator", err));
 
             const fetchHistory = () => {
-              fetch(`http://${host}:5001/api/history`)
+              fetchWithBackendFallback(`/api/history`)
                 .then(res => res.json())
                 .then(data => { if (data && data.data) setDbHistory(data.data); })
                 .catch(e => console.log("DB fetch fail", e));
