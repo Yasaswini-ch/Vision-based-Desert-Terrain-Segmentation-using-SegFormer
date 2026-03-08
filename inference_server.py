@@ -303,6 +303,58 @@ def segment_batch():
 def current_navigation():
     return jsonify(last_nav_command)
 
+import math
+import requests
+
+def deg2num(lat_deg, lon_deg, zoom):
+    lat_rad = math.radians(lat_deg)
+    n = 2.0 ** zoom
+    xtile = int((lon_deg + 180.0) / 360.0 * n)
+    ytile = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
+    return (xtile, ytile)
+
+@app.route('/api/location', methods=['GET'])
+def api_location():
+    location_name = request.args.get('q', '')
+    if not location_name:
+        err = jsonify({"error": "Empty query"})
+        err.headers.add("Access-Control-Allow-Origin", "*")
+        return err, 400
+    try:
+        geocode_url = f"https://nominatim.openstreetmap.org/search?q={requests.utils.quote(location_name)}&format=json&limit=1"
+        headers = {'User-Agent': 'DesertSegStudio/2.0'}
+        geo_req = requests.get(geocode_url, headers=headers, timeout=5)
+        geo_data = geo_req.json()
+        if not geo_data:
+            err = jsonify({"error": "Location not found"})
+            err.headers.add("Access-Control-Allow-Origin", "*")
+            return err, 404
+            
+        lat = float(geo_data[0]["lat"])
+        lon = float(geo_data[0]["lon"])
+        display_name = geo_data[0]["display_name"]
+        osm_type = geo_data[0].get("osm_type", "unknown")
+            
+        elev_req = requests.get(f"https://api.open-elevation.com/api/v1/lookup?locations={lat},{lon}", timeout=5)
+        elev_data = elev_req.json()
+        elevation = elev_data["results"][0]["elevation"] if "results" in elev_data else 0
+        
+        xt, yt = deg2num(lat, lon, 12)
+        
+        res = jsonify({
+            "data": {
+                "lat": lat, "lon": lon, "name": display_name,
+                "elevation": elevation, "type": osm_type,
+                "xtile": xt, "ytile": yt
+            }
+        })
+        res.headers.add("Access-Control-Allow-Origin", "*")
+        return res
+    except Exception as e:
+        err = jsonify({"error": str(e)})
+        err.headers.add("Access-Control-Allow-Origin", "*")
+        return err, 500
+
 @app.route('/stream/mjpeg')
 def mjpeg_stream():
     def generate():

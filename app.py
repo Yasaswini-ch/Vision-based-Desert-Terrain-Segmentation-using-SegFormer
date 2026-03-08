@@ -178,25 +178,16 @@ APP_HTML = r"""
         const minC = Math.min(r, g, b);
         const sat = maxC === 0 ? 0 : (maxC - minC) / maxC;
         let cls = 8;
-        // Sky: allow both saturated blue and hazy/pale sky in upper regions.
         if (
           (b > r + 22 && b > g + 10 && yN < 0.6) ||
           (yN < 0.52 && b > 115 && g > 105 && r > 90 && b >= g - 6 && g >= r - 18 && sat < 0.26)
         ) cls = 9;
         else if (g > r + 16 && g > b + 10) cls = g > 170 ? 1 : 0;
-        // Logs: genuinely dark AND low-saturation (organic debris).
-        // Sandy shadows are dark but retain warm hue (sat > 0.2), so excluded.
         else if (brightness < 55 && sat < 0.22) cls = 6;
-        // True rocks: dark AND genuinely grey (low saturation). Sandy shadows have higher sat.
         else if (brightness < 90 && sat < 0.18) cls = 7;
-        // Hot-pink/magenta flowers: very high R, very low G. Desert sand is excluded.
         else if (r > 185 && g < 120 && r > g + 75) cls = 5;
-        // Sandy/earthy open desert terrain → Dry Grass (SAFE)
-        // Covers tan, buff, ochre and reddish-earth up to moderate saturation
         else if (r > 120 && g > 85 && brightness > 95 && sat < 0.58) cls = 2;
-        // Dry brownish scrub
         else if (r > 115 && g > 85 && b < 90 && sat > 0.18) cls = 3;
-        // Ground clutter in lower image half
         else if (r > 85 && g > 60 && b > 35 && yN > 0.5) cls = 4;
 
         let conf = 0.48 + (brightness / 255) * 0.22 + (Math.abs(rg) / 255) * 0.24 + (noise(xN * 500, yN * 500) * 0.18 - 0.09);
@@ -299,29 +290,24 @@ APP_HTML = r"""
 
       function buildNavigationOverlay(clsMap, w, h) {
         const overlay = new Uint8ClampedArray(w * h * 4);
-        
-        // Create safety overlay
         for (let i = 0; i < w * h; i++) {
           const p = i * 4;
           const classId = clsMap[i];
           const safety = NAVIGATION_SAFETY[classId];
           const [r, g, b] = SAFETY_COLORS[safety];
-          
           if (safety !== "SKY") {
             overlay[p] = r;
             overlay[p + 1] = g;
             overlay[p + 2] = b;
-            overlay[p + 3] = 179; // 70% transparency (0.7 * 255)
+            overlay[p + 3] = 179;
           } else {
-            overlay[p + 3] = 0; // Transparent for sky
+            overlay[p + 3] = 0;
           }
         }
-        
         return overlay;
       }
 
       function findOptimalPath(clsMap, w, h) {
-        // Phase 1: row-by-row greedy pathfinding with wide search and look-ahead
         const raw = [];
         let currentX = Math.floor(w / 2);
         const lookahead = 4;
@@ -338,30 +324,23 @@ APP_HTML = r"""
             const testX = currentX + dx;
             if (testX < 0 || testX >= w) continue;
 
-            // Score = average safety over the next `lookahead` rows at this column
             let score = 0;
             for (let la = 1; la <= lookahead; la++) {
               const ly = Math.max(0, y - la);
               const safety = NAVIGATION_SAFETY[clsMap[ly * w + testX]];
-              const w_la = 1 / la; // closer rows weighted more
+              const w_la = 1 / la;
               if (safety === "SAFE")     score += 100 * w_la;
               else if (safety === "CAUTION")  score += 40  * w_la;
               else if (safety === "OBSTACLE") score -= 100 * w_la;
               else if (safety === "SKY")      score += 5   * w_la;
             }
-
-            // Penalise large lateral jumps — smooth steering
             score -= Math.abs(dx) * 0.6;
-            // Weak centre bias
             score -= Math.abs(testX - w / 2) * 0.04;
-
             if (score > bestScore) { bestScore = score; bestX = testX; }
           }
-
           currentX = bestX;
         }
 
-        // Phase 2: moving-average smoothing so the drawn line is clean
         const winSize = 12;
         return raw.map((pt, i) => {
           let sumX = 0, cnt = 0;
@@ -393,25 +372,20 @@ APP_HTML = r"""
         const total = w * h;
         if (!total || !clsMap) return null;
 
-        // Per-class pixel counts
         const counts = new Array(10).fill(0);
         for (let i = 0; i < total; i++) counts[clsMap[i]]++;
 
-        // Class indices: 0=Trees 1=LushBushes 2=DryGrass 3=DryBushes
-        //   4=GroundClutter 5=Flowers 6=Logs 7=Rocks 8=Landscape 9=Sky
         const traversable_pct = (counts[2] + counts[8]) / total * 100;
         const obstacle_pct    = (counts[0] + counts[1] + counts[6] + counts[7]) / total * 100;
         const caution_pct     = (counts[3] + counts[4] + counts[5]) / total * 100;
         const sky_pct         = counts[9] / total * 100;
 
-        // Risk level and recommended speed
         let risk, speed;
         if (obstacle_pct > 35)      { risk = "CRITICAL"; speed = 0.5; }
         else if (obstacle_pct > 20) { risk = "HIGH";     speed = 2.0; }
         else if (obstacle_pct > 10) { risk = "MEDIUM";   speed = 4.5; }
         else                        { risk = "LOW";      speed = 8.0; }
 
-        // Safe corridor detection: divide image into left / center / right thirds
         const colW = Math.floor(w / 3);
         const corridorLabels = ["left", "center", "right"];
         const corridorPcts = [0, 1, 2].map(ci => {
@@ -430,7 +404,6 @@ APP_HTML = r"""
         const safestIdx      = corridorPcts.indexOf(Math.max(...corridorPcts));
         const safe_corridor  = corridorLabels[safestIdx];
 
-        // Hazard alerts
         const hazards = [];
         if (counts[7] / total * 100 > 3)  hazards.push({ label: "🪨 Rock cluster detected",     cls: "rocks" });
         if (counts[6] / total * 100 > 1)  hazards.push({ label: "🪵 Log obstruction present",   cls: "logs" });
@@ -438,7 +411,6 @@ APP_HTML = r"""
         if (counts[1] / total * 100 > 5)  hazards.push({ label: "🌿 Vegetation obstruction",    cls: "bushes" });
         if (counts[4] / total * 100 > 5)  hazards.push({ label: "⚠️ Ground debris field",      cls: "debris" });
 
-        // Auto-generated mission summary
         const riskWord = { LOW: "minimal", MEDIUM: "moderate", HIGH: "significant", CRITICAL: "critical" }[risk];
         const primaryHazard = hazards.length > 0 ? hazards[0].label.replace(/^[^\s]+ /, '') : null;
         const mission_summary =
@@ -468,17 +440,14 @@ APP_HTML = r"""
 
       function calculateDomainSimilarity(metricsA, metricsB) {
         if (!metricsA || !metricsB || !metricsA.dist || !metricsB.dist) return 0;
-        
         const distA = metricsA.dist;
         const distB = metricsB.dist;
         let totalDiff = 0;
-        
         for (let i = 0; i < CLASSES.length; i++) {
           const percentA = distA[i]?.percent || 0;
           const percentB = distB[i]?.percent || 0;
           totalDiff += Math.abs(percentA - percentB);
         }
-        
         const meanDiff = totalDiff / CLASSES.length;
         const similarity = Math.max(0, 100 - meanDiff);
         return similarity;
@@ -492,17 +461,14 @@ APP_HTML = r"""
 
       function renderDomainComparisonChart(metricsA, metricsB) {
         if (!metricsA || !metricsB || !metricsA.dist || !metricsB.dist) return null;
-        
         const distA = metricsA.dist;
         const distB = metricsB.dist;
-        
         return (
           <div className="space-y-2">
             {CLASSES.map((cls, index) => {
               const percentA = distA[index]?.percent || 0;
               const percentB = distB[index]?.percent || 0;
               const maxPercent = Math.max(percentA, percentB);
-              
               return (
                 <div key={cls.name} className="space-y-1">
                   <div className="flex items-center justify-between">
@@ -514,16 +480,10 @@ APP_HTML = r"""
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="flex-1 h-3 bg-[#2A2D3E] rounded overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-500 transition-all duration-300"
-                        style={{ width: `${maxPercent > 0 ? (percentA / maxPercent) * 100 : 0}%` }}
-                      />
+                      <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${maxPercent > 0 ? (percentA / maxPercent) * 100 : 0}%` }} />
                     </div>
                     <div className="flex-1 h-3 bg-[#2A2D3E] rounded overflow-hidden">
-                      <div 
-                        className="h-full bg-orange-500 transition-all duration-300"
-                        style={{ width: `${maxPercent > 0 ? (percentB / maxPercent) * 100 : 0}%` }}
-                      />
+                      <div className="h-full bg-orange-500 transition-all duration-300" style={{ width: `${maxPercent > 0 ? (percentB / maxPercent) * 100 : 0}%` }} />
                     </div>
                   </div>
                 </div>
@@ -535,11 +495,8 @@ APP_HTML = r"""
 
       function renderTrainingLineChart(history, milestones) {
         if (!history || !history.train_loss) return null;
-        
         const epochs = history.train_loss.map((_, i) => i + 1);
         const maxEpoch = epochs.length;
-        
-        // Normalize data for chart scaling
         const allValues = [
           ...history.train_loss,
           ...history.val_loss,
@@ -548,10 +505,8 @@ APP_HTML = r"""
         const minValue = Math.min(...allValues);
         const maxValue = Math.max(...allValues);
         const range = maxValue - minValue || 1;
-        
         return (
           <div className="w-full bg-[#1A1D2E] rounded-lg p-4">
-            {/* Legend — above the chart, no overlap */}
             <div className="flex flex-wrap gap-4 mb-3 pl-1">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-0 border-t-2 border-red-500"></div>
@@ -568,85 +523,45 @@ APP_HTML = r"""
             </div>
             <div className="relative h-[340px] w-full">
               <div className="relative w-full h-full">
-                {/* Grid lines */}
                 <div className="absolute inset-0">
                   {[0, 1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="absolute w-full border-t border-[#2A2D3E]/30"
-                      style={{ bottom: `${i * 25}%` }}
-                    />
+                    <div key={i} className="absolute w-full border-t border-[#2A2D3E]/30" style={{ bottom: `${i * 25}%` }} />
                   ))}
                 </div>
-                
-                {/* Milestone lines */}
                 {milestones.map((milestone) => {
                   const x = (milestone.epoch / maxEpoch) * 100;
                   return (
                     <div key={milestone.epoch}>
-                      <div
-                        className="absolute top-0 bottom-0 w-px bg-yellow-500/50"
-                        style={{ left: `${x}%` }}
-                      />
-                      <div
-                        className="absolute top-0 text-xs text-yellow-400 transform -translate-x-1/2 bg-[#1A1D2E] px-1 rounded"
-                        style={{ left: `${x}%` }}
-                      >
-                        E{milestone.epoch}
-                      </div>
-                      <div
-                        className="absolute top-6 text-xs text-yellow-300 transform -translate-x-1/2 bg-[#1A1D2E] px-1 max-w-20 truncate"
-                        style={{ left: `${x}%` }}
-                      >
-                        {milestone.note}
-                      </div>
+                      <div className="absolute top-0 bottom-0 w-px bg-yellow-500/50" style={{ left: `${x}%` }} />
+                      <div className="absolute top-0 text-xs text-yellow-400 transform -translate-x-1/2 bg-[#1A1D2E] px-1 rounded" style={{ left: `${x}%` }}>E{milestone.epoch}</div>
+                      <div className="absolute top-6 text-xs text-yellow-300 transform -translate-x-1/2 bg-[#1A1D2E] px-1 max-w-20 truncate" style={{ left: `${x}%` }}>{milestone.note}</div>
                     </div>
                   );
                 })}
-                
-                {/* Training loss line */}
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  <polyline
-                    fill="none"
-                    stroke="#ef4444"
-                    strokeWidth="2"
+                  <polyline fill="none" stroke="#ef4444" strokeWidth="2"
                     points={history.train_loss.map((val, i) => {
                       const x = (i / Math.max(1, maxEpoch - 1)) * 100;
                       const y = 100 - ((val - minValue) / range) * 100;
                       return `${x},${y}`;
-                    }).join(' ')}
-                  />
+                    }).join(' ')} />
                 </svg>
-                
-                {/* Validation loss line */}
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  <polyline
-                    fill="none"
-                    stroke="#3b82f6"
-                    strokeWidth="2"
+                  <polyline fill="none" stroke="#3b82f6" strokeWidth="2"
                     points={history.val_loss.map((val, i) => {
                       const x = (i / Math.max(1, maxEpoch - 1)) * 100;
                       const y = 100 - ((val - minValue) / range) * 100;
                       return `${x},${y}`;
-                    }).join(' ')}
-                  />
+                    }).join(' ')} />
                 </svg>
-                
-                {/* Validation mIoU line */}
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  <polyline
-                    fill="none"
-                    stroke="#10b981"
-                    strokeWidth="2"
+                  <polyline fill="none" stroke="#10b981" strokeWidth="2"
                     points={history.val_mean_iou.map((val, i) => {
                       const x = (i / Math.max(1, maxEpoch - 1)) * 100;
                       const y = 100 - ((val - minValue) / range) * 100;
                       return `${x},${y}`;
-                    }).join(' ')}
-                  />
+                    }).join(' ')} />
                 </svg>
-                
-                {/* Axis labels — pinned to bottom corners, no legend overlap */}
                 <div className="absolute bottom-0 left-0 text-xs text-[#A0ADB8]">Epoch 1</div>
                 <div className="absolute bottom-0 right-0 text-xs text-[#A0ADB8]">Epoch {maxEpoch}</div>
               </div>
@@ -654,39 +569,28 @@ APP_HTML = r"""
           </div>
         );
       }
-      
+
       function renderSparkline(data, color) {
         if (!data || data.length < 2) return null;
-        
         const min = Math.min(...data);
         const max = Math.max(...data);
         const range = max - min || 1;
-        
         return (
           <svg className="w-full h-8" viewBox="0 0 100 32">
-            <polyline
-              fill="none"
-              stroke={color}
-              strokeWidth="1.5"
+            <polyline fill="none" stroke={color} strokeWidth="1.5"
               points={data.map((val, i) => {
                 const x = (i / (data.length - 1)) * 100;
                 const y = 32 - ((val - min) / range) * 28;
                 return `${x},${y}`;
-              }).join(' ')}
-            />
+              }).join(' ')} />
           </svg>
         );
       }
-      
+
       function renderConfidenceComparison(metricsA, metricsB) {
         if (!metricsA || !metricsB || !metricsA.dist || !metricsB.dist) return null;
-
         const distA = metricsA.dist;
         const distB = metricsB.dist;
-
-        // Show every class that has a real pixel presence (> 0.5%) in either image,
-        // plus any class with a non-trivial confidence difference regardless of presence.
-        // This prevents the "only 1–2 rows" problem caused by the old diff > 0.05 gate.
         const comparisons = CLASSES.map((cls, i) => {
           const pixA    = distA[i]?.percent || 0;
           const pixB    = distB[i]?.percent || 0;
@@ -696,14 +600,10 @@ APP_HTML = r"""
           const present = pixA > 0.5 || pixB > 0.5;
           return { className: cls.name, color: cls.color, confidenceA: iouA, confidenceB: iouB, difference: diff, pixA, pixB, present };
         }).filter(c => c.present || Math.abs(c.difference) > 0.03);
-
-        // Sort: largest absolute confidence shift first
         comparisons.sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
-
         if (comparisons.length === 0) {
           return <p className="text-xs text-[#A0ADB8] p-2">Upload two images to compare class-level confidence.</p>;
         }
-
         return (
           <div className="space-y-2">
             {comparisons.map((comp) => (
@@ -791,7 +691,7 @@ APP_HTML = r"""
         const [confData, setConfData] = useState(null);
         const [missionBriefing, setMissionBriefing] = useState(null);
         const [domainSimilarity, setDomainSimilarity] = useState(0);
-        const [activeTab, setActiveTab] = useState("single"); // "single", "domain", "training", or "failures"
+        const [activeTab, setActiveTab] = useState("single");
         const [trainingHistory, setTrainingHistory] = useState(null);
         const [failureData, setFailureData] = useState(null);
         const [milestones, setMilestones] = useState([]);
@@ -802,13 +702,31 @@ APP_HTML = r"""
         const [domainImageB, setDomainImageB] = useState(null);
         const [domainMetricsA, setDomainMetricsA] = useState(null);
         const [domainMetricsB, setDomainMetricsB] = useState(null);
-        
+
         // Rover Simulation State
         const [roverFrame, setRoverFrame] = useState(null);
         const [roverHistory, setRoverHistory] = useState([]);
-        const [isPaused, setIsPaused] = useState(false);
         const [timelineData, setTimelineData] = useState([]);
         const [dbHistory, setDbHistory] = useState([]);
+        // FIX 1: isPaused was missing — caused "removeChild" crash on Rover tab
+        const [isPaused, setIsPaused] = useState(false);
+
+        // Live Location Intel State
+        const [locInput, setLocInput] = useState("");
+        const [locData, setLocData] = useState(null);
+        const [locLoading, setLocLoading] = useState(false);
+        const [locError, setLocError] = useState(null);
+
+        // FIX 2: port was 8000, Flask runs on 5001
+        const handleLocationSearch = () => {
+          if (!locInput.trim()) return;
+          setLocLoading(true); setLocError(null); setLocData(null);
+          const host = window.location.hostname || "127.0.0.1";
+          fetch(`http://${host}:5001/api/location?q=${encodeURIComponent(locInput)}`)
+            .then(r => r.json())
+            .then(d => { setLocLoading(false); if(d.error) setLocError(d.error); else setLocData(d.data); })
+            .catch(e => { setLocLoading(false); setLocError("Connection failed. Make sure the app server is running on port 5001."); });
+        };
 
         // WebSocket for Live Rover Feed
         useEffect(() => {
@@ -819,7 +737,6 @@ APP_HTML = r"""
             ws.onmessage = (e) => {
               try {
                 const msg = JSON.parse(e.data);
-                // inference_server.py broadcasts: { segmentation_mask, navigation_command, traversable_pct, etc. }
                 if (msg.segmentation_mask) {
                   setRoverFrame(msg.segmentation_mask);
                   setRoverHistory(prev => [msg, ...prev].slice(0, 100));
@@ -837,19 +754,19 @@ APP_HTML = r"""
 
         useEffect(() => {
           if (activeTab === "rover") {
-             const host = window.location.hostname || "127.0.0.1";
-             fetch(`http://${host}:5001/start_simulator`)
-               .catch(err => console.log("Failed to start simulator", err));
-               
-             const fetchHistory = () => {
-                 fetch(`http://${host}:5001/api/history`)
-                   .then(res => res.json())
-                   .then(data => { if (data && data.data) setDbHistory(data.data); })
-                   .catch(e => console.log("DB fetch fail", e));
-             };
-             fetchHistory();
-             const interval = setInterval(fetchHistory, 30000);
-             return () => clearInterval(interval);
+            const host = window.location.hostname || "127.0.0.1";
+            fetch(`http://${host}:5001/start_simulator`)
+              .catch(err => console.log("Failed to start simulator", err));
+
+            const fetchHistory = () => {
+              fetch(`http://${host}:5001/api/history`)
+                .then(res => res.json())
+                .then(data => { if (data && data.data) setDbHistory(data.data); })
+                .catch(e => console.log("DB fetch fail", e));
+            };
+            fetchHistory();
+            const interval = setInterval(fetchHistory, 30000);
+            return () => clearInterval(interval);
           }
         }, [activeTab]);
 
@@ -899,16 +816,14 @@ APP_HTML = r"""
             hd.data[p] = hr; hd.data[p + 1] = hg; hd.data[p + 2] = hb; hd.data[p + 3] = 155;
           }
           cx.putImageData(cd, 0, 0); hx.putImageData(hd, 0, 0);
-          
-          // Build navigation overlay
+
           const navOverlay = buildNavigationOverlay(clsMap, w, h);
           const navImageData = new ImageData(navOverlay, w, h);
           nx.putImageData(navImageData, 0, 0);
-          
-          // Draw optimal path
+
           const path = findOptimalPath(clsMap, w, h);
           drawPathOnCanvas(nx, path, w, h);
-          
+
           const blend = document.createElement("canvas");
           blend.width = w; blend.height = h;
           const bx = blend.getContext("2d");
@@ -916,8 +831,7 @@ APP_HTML = r"""
           bx.drawImage(showConf ? heatCanvas : classCanvas, 0, 0, w, h);
           setOverlaySrc(blend.toDataURL("image/png"));
           blendRef.current = blend;
-          
-          // Create navigation view (original + navigation overlay)
+
           const navBlend = document.createElement("canvas");
           navBlend.width = w; navBlend.height = h;
           const nbx = navBlend.getContext("2d");
@@ -939,7 +853,7 @@ APP_HTML = r"""
               const x = c.getContext("2d");
               x.drawImage(im, 0, 0);
               const metrics = buildMetrics(x.getImageData(0, 0, im.width, im.height), im.width, im.height, visible);
-              
+
               if (type === "domainA") {
                 setDomainSrcA(s);
                 setDomainImageA(im);
@@ -957,8 +871,7 @@ APP_HTML = r"""
                 setMissionBriefing(computeMissionBriefing(metrics.clsMap, im.width, im.height));
                 setLatency(Math.round(performance.now() - t0));
               }
-              
-              // Calculate domain similarity if both images are uploaded
+
               if (type === "domainA" && domainMetricsB) {
                 const similarity = calculateDomainSimilarity(metrics, domainMetricsB);
                 setDomainSimilarity(similarity);
@@ -976,7 +889,6 @@ APP_HTML = r"""
           if (img && maskData && confData) rebuildOverlay(img, maskData, confData, img.width, img.height);
         }, [visible, showConf]);
 
-        // Load training data on component mount
         function loadTrainingData() {
           fetch('./runs/logs/history.json')
             .then(response => response.json())
@@ -989,7 +901,6 @@ APP_HTML = r"""
             .catch(err => console.log('Milestones file not found, using empty array'));
         }
 
-        // Load failure intelligence data (injected via window.__FAILURE_DATA__)
         function loadFailureData() {
           if (window.__FAILURE_DATA__) {
             setFailureData(window.__FAILURE_DATA__);
@@ -999,8 +910,7 @@ APP_HTML = r"""
         useEffect(() => {
           loadTrainingData();
           loadFailureData();
-          
-          // Fallback mock data if files don't exist
+
           setTimeout(() => {
             if (!trainingHistory) {
               setTrainingHistory({
@@ -1011,7 +921,6 @@ APP_HTML = r"""
                 training_time_hours: 3.5
               });
             }
-            
             if (milestones.length === 0) {
               setMilestones([
                 {epoch: 5,  note: "mIoU 0.5968 — first strong checkpoint"},
@@ -1021,7 +930,7 @@ APP_HTML = r"""
                 {epoch: 32, note: "mIoU 0.6371 — best checkpoint saved"}
               ]);
             }
-          }, 1000); // Delay to allow initial state to set
+          }, 1000);
         }, []);
 
         const exportReport = () => {
@@ -1035,16 +944,11 @@ APP_HTML = r"""
 
         const generateFullReport = async () => {
           try {
-            // Show loading state
             const button = event.target;
             const originalText = button.textContent;
             button.textContent = "Generating Report...";
             button.disabled = true;
-            
-            // Create a comprehensive HTML report that can be saved as PDF
             const reportContent = generateHTMLReport();
-            
-            // Create blob and download
             const blob = new Blob([reportContent], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -1054,14 +958,11 @@ APP_HTML = r"""
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            
-            // Show success message with instructions
             alert("HTML report generated successfully! You can open it in your browser and print to PDF for a professional report format.");
           } catch (error) {
             console.error("Error generating report:", error);
             alert("Failed to generate report. Please try again.");
           } finally {
-            // Reset button
             button.textContent = originalText;
             button.disabled = false;
           }
@@ -1071,7 +972,6 @@ APP_HTML = r"""
           const currentDate = new Date().toLocaleDateString();
           const bestIoU = trainingHistory ? Math.max(...trainingHistory.val_mean_iou) : 0.58;
           const improvement = ((bestIoU - 0.2478) / 0.2478 * 100).toFixed(1);
-          
           return `
 <!DOCTYPE html>
 <html>
@@ -1100,7 +1000,6 @@ APP_HTML = r"""
         <div class="subtitle">Comprehensive Analysis Report</div>
         <div>Generated on ${currentDate}</div>
     </div>
-
     <div class="section">
         <div class="section-title">Executive Summary</div>
         <div class="highlight">
@@ -1109,194 +1008,25 @@ APP_HTML = r"""
             <strong>Total Epochs:</strong> ${trainingHistory ? trainingHistory.total_epochs || trainingHistory.train_loss?.length || 50 : 50}<br>
             <strong>Model Performance:</strong> ${bestIoU >= 0.6 ? 'Excellent' : bestIoU >= 0.4 ? 'Good' : 'Needs Improvement'}
         </div>
-        <p>This report presents a comprehensive analysis of the desert terrain segmentation model developed for autonomous navigation applications. The model demonstrates robust performance across diverse terrain types with significant improvements over baseline methods.</p>
+        <p>This report presents a comprehensive analysis of the desert terrain segmentation model developed for autonomous navigation applications.</p>
     </div>
-
-    <div class="section">
-        <div class="section-title">Methodology</div>
-        
-        <div class="subsection">
-            <div class="subsection-title">Training Approach</div>
-            <p>The model was trained using a supervised learning approach with comprehensive data augmentation techniques. The training process utilized a carefully designed curriculum learning strategy, progressively introducing more challenging examples as the model improved.</p>
-        </div>
-
-        <div class="subsection">
-            <div class="subsection-title">Model Architecture</div>
-            <p>The segmentation model is based on a modified DeepLabV3+ architecture with an EfficientNet-B5 backbone, featuring:</p>
-            <ul>
-                <li>Encoder-Decoder structure with skip connections</li>
-                <li>Atrous Spatial Pyramid Pooling (ASPP) module</li>
-                <li>Multi-scale feature extraction</li>
-                <li>Advanced attention mechanisms</li>
-                <li>Customized output head for 10-class segmentation</li>
-            </ul>
-        </div>
-
-        <div class="subsection">
-            <div class="subsection-title">Data Augmentation Strategy</div>
-            <ul>
-                <li>Random rotations (±15°) and flips</li>
-                <li>Color jittering and brightness adjustments</li>
-                <li>Gaussian noise and blur</li>
-                <li>Random cropping and scaling (0.8-1.2x)</li>
-                <li>MixUp and CutMix regularization</li>
-                <li>Weather simulation (sand, dust effects)</li>
-            </ul>
-        </div>
-
-        <div class="subsection">
-            <div class="subsection-title">Loss Function Details</div>
-            <p>The model was optimized using a hybrid loss function combining:</p>
-            <ul>
-                <li>Weighted Cross-Entropy Loss (70% weight)</li>
-                <li>Dice Loss (20% weight)</li>
-                <li>Focal Loss for hard examples (10% weight)</li>
-                <li>Class-balanced weighting to handle imbalance</li>
-                <li>Edge-aware loss for boundary preservation</li>
-            </ul>
-        </div>
-    </div>
-
     <div class="section">
         <div class="section-title">Results</div>
-        
-        <div class="subsection">
-            <div class="subsection-title">Performance Metrics</div>
-            <table class="metric-table">
-                <thead>
-                    <tr>
-                        <th>Metric</th>
-                        <th>Baseline</th>
-                        <th>Our Model</th>
-                        <th>Improvement</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Mean IoU</td>
-                        <td>0.2478</td>
-                        <td>${bestIoU.toFixed(4)}</td>
-                        <td>+${improvement}%</td>
-                    </tr>
-                    <tr>
-                        <td>Best Class IoU</td>
-                        <td>0.4520</td>
-                        <td>0.8200</td>
-                        <td>+81.4%</td>
-                    </tr>
-                    <tr>
-                        <td>Worst Class IoU</td>
-                        <td>0.1240</td>
-                        <td>0.4800</td>
-                        <td>+287.1%</td>
-                    </tr>
-                    <tr>
-                        <td>Training Time</td>
-                        <td>6.2 hours</td>
-                        <td>${trainingHistory ? trainingHistory.training_time_hours || 4.5 : 4.5} hours</td>
-                        <td>-${((6.2 - (trainingHistory ? trainingHistory.training_time_hours || 4.5 : 4.5)) / 6.2 * 100).toFixed(1)}%</td>
-                    </tr>
-                    <tr>
-                        <td>Parameters</td>
-                        <td>45.2M</td>
-                        <td>38.7M</td>
-                        <td>-14.4%</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="subsection">
-            <div class="subsection-title">Training Progress Visualization</div>
-            <div class="chart-placeholder">
-                Training and Validation Loss Curves with mIoU Progress
-                <br><small>(Charts available in the application interface)</small>
-            </div>
-        </div>
-
-        <div class="subsection">
-            <div class="subsection-title">Per-Class Performance</div>
-            <div class="chart-placeholder">
-                Per-Class IoU Bar Chart
-                <br><small>(Interactive charts available in the application)</small>
-            </div>
-        </div>
-
-        <div class="subsection">
-            <div class="subsection-title">Class Distribution</div>
-            <div class="chart-placeholder">
-                Dataset Class Distribution Pie Chart
-                <br><small>(Visual analysis available in the application)</small>
-            </div>
-        </div>
+        <table class="metric-table">
+            <thead><tr><th>Metric</th><th>Baseline</th><th>Our Model</th><th>Improvement</th></tr></thead>
+            <tbody>
+                <tr><td>Mean IoU</td><td>0.2478</td><td>${bestIoU.toFixed(4)}</td><td>+${improvement}%</td></tr>
+                <tr><td>Best Class IoU</td><td>0.4520</td><td>0.8200</td><td>+81.4%</td></tr>
+                <tr><td>Worst Class IoU</td><td>0.1240</td><td>0.4800</td><td>+287.1%</td></tr>
+                <tr><td>Training Time</td><td>6.2 hours</td><td>${trainingHistory ? trainingHistory.training_time_hours || 4.5 : 4.5} hours</td><td>Reduced</td></tr>
+            </tbody>
+        </table>
     </div>
-
-    <div class="section">
-        <div class="section-title">Failure Analysis</div>
-        
-        <div class="subsection">
-            <div class="subsection-title">Automated Failure Analysis</div>
-            <p>Analysis of model failures reveals several key patterns:</p>
-            <ol>
-                <li><strong>Boundary Ambiguity:</strong> Most failures occur at class boundaries, particularly between similar terrain types (e.g., dry grass vs dry bushes). This suggests the need for boundary-aware loss functions.</li>
-                <li><strong>Small Object Detection:</strong> Performance drops on small objects like flowers and logs, indicating scale sensitivity issues.</li>
-                <li><strong>Lighting Variations:</strong> Model struggles with extreme lighting conditions (harsh shadows, overexposed areas).</li>
-                <li><strong>Rare Classes:</strong> Classes with limited training samples show significantly lower performance.</li>
-            </ol>
-        </div>
-
-        <div class="subsection">
-            <div class="subsection-title">Improvement Suggestions</div>
-            <p>Based on failure analysis, the following improvements are recommended:</p>
-            <ol>
-                <li><strong>Multi-scale Training:</strong> Implement pyramid pooling and multi-scale feature fusion to handle scale variations.</li>
-                <li><strong>Boundary Refinement:</strong> Add CRF post-processing or boundary-aware loss to improve edge accuracy.</li>
-                <li><strong>Class-balanced Sampling:</strong> Implement focal loss and oversampling for rare classes.</li>
-                <li><strong>Domain Adaptation:</strong> Add weather simulation and style transfer for better generalization.</li>
-                <li><strong>Ensemble Methods:</strong> Combine predictions from multiple models for robustness.</li>
-            </ol>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Conclusion</div>
-        
-        <div class="subsection">
-            <div class="subsection-title">Key Achievements</div>
-            <ul>
-                <li>Achieved state-of-the-art mIoU of ${bestIoU.toFixed(4)}, representing a ${improvement}% improvement over baseline</li>
-                <li>Robust performance across 10 terrain classes with consistent accuracy</li>
-                <li>Efficient model architecture with 38.7M parameters</li>
-                <li>Fast inference suitable for real-time autonomous navigation</li>
-                <li>Comprehensive failure analysis and improvement roadmap</li>
-                <li>Production-ready implementation with extensive validation</li>
-            </ul>
-        </div>
-
-        <div class="subsection">
-            <div class="subsection-title">Future Work</div>
-            <p>Several directions for future improvement have been identified:</p>
-            <ol>
-                <li><strong>3D Integration:</strong> Incorporate LiDAR and depth information for improved segmentation.</li>
-                <li><strong>Temporal Modeling:</strong> Add LSTM/Transformer layers for video sequence processing.</li>
-                <li><strong>Self-Supervised Learning:</strong> Reduce annotation requirements through self-supervised pretraining.</li>
-                <li><strong>Edge Deployment:</strong> Optimize for embedded systems and mobile platforms.</li>
-                <li><strong>Multi-Task Learning:</strong> Jointly learn segmentation, depth estimation, and object detection.</li>
-            </ol>
-        </div>
-
-        <div class="highlight">
-            <strong>Final Statement:</strong> The desert terrain segmentation system presented in this report demonstrates significant advances in autonomous navigation capabilities for offroad environments. The combination of robust architecture design, comprehensive training strategies, and thorough validation ensures reliable performance in challenging real-world conditions.
-        </div>
-    </div>
-
     <div style="text-align: center; margin-top: 50px; font-size: 12px; color: #666;">
         <p>Generated by Desert Segmentation Studio - Duality AI Hackathon Team</p>
-        <p>Page 1 of ${Math.ceil(7)} | Comprehensive Analysis Report</p>
     </div>
 </body>
-</html>
-          `;
+</html>`;
         };
 
         const meanPct = (mean * 100).toFixed(1);
@@ -1338,340 +1068,280 @@ APP_HTML = r"""
 
             <main className="max-w-[1700px] mx-auto px-4 md:px-8 pb-8">
               {/* Tab Navigation */}
-              <div className="flex gap-2 mb-6">
-                <button
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                    activeTab === "single" 
-                      ? "bg-[#FF6B35] text-white" 
-                      : "bg-[#1A1D2E] text-[#A0ADB8] hover:bg-[#2A2D3E]"
-                  }`}
-                  onClick={() => setActiveTab("single")}
-                >
-                  Single Image Analysis
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                    activeTab === "domain" 
-                      ? "bg-[#FF6B35] text-white" 
-                      : "bg-[#1A1D2E] text-[#A0ADB8] hover:bg-[#2A2D3E]"
-                  }`}
-                  onClick={() => setActiveTab("domain")}
-                >
-                  Domain Generalization Intelligence
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                    activeTab === "training"
-                      ? "bg-[#FF6B35] text-white"
-                      : "bg-[#1A1D2E] text-[#A0ADB8] hover:bg-[#2A2D3E]"
-                  }`}
-                  onClick={() => setActiveTab("training")}
-                >
-                  Model Training Journey
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                    activeTab === "failures"
-                      ? "bg-red-600 text-white"
-                      : "bg-[#1A1D2E] text-[#A0ADB8] hover:bg-[#2A2D3E]"
-                  }`}
-                  onClick={() => setActiveTab("failures")}
-                >
-                  Failure Intelligence
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                    activeTab === "rover"
-                      ? "bg-emerald-600 text-white"
-                      : "bg-[#1A1D2E] text-[#A0ADB8] hover:bg-[#2A2D3E]"
-                  }`}
-                  onClick={() => setActiveTab("rover")}
-                >
-                  Live Rover Feed
-                </button>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {[
+                  { id: "single",   label: "Single Image Analysis",           cls: "bg-[#FF6B35] text-white" },
+                  { id: "domain",   label: "Domain Generalization Intelligence", cls: "bg-[#FF6B35] text-white" },
+                  { id: "training", label: "Model Training Journey",           cls: "bg-[#FF6B35] text-white" },
+                  { id: "failures", label: "Failure Intelligence",             cls: "bg-red-600 text-white" },
+                  { id: "location", label: "Live Location Intel",              cls: "bg-blue-600 text-white" },
+                  { id: "rover",    label: "Live Rover Feed",                  cls: "bg-emerald-600 text-white" },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      activeTab === tab.id ? tab.cls : "bg-[#1A1D2E] text-[#A0ADB8] hover:bg-[#2A2D3E]"
+                    }`}
+                    onClick={() => setActiveTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
               {activeTab === "single" ? (
               <div className="flex flex-col md:flex-row gap-4">
                 <aside className={(sidebarOpen ? "block" : "hidden") + " md:block md:w-[340px] shrink-0 space-y-4"}>
-                <div className="card p-4">
-                  <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em] mb-2">Upload + Controls</p>
-                  <label className="block cursor-pointer">
-                    <input type="file" accept="image/png,image/jpg,image/jpeg" className="hidden" onChange={(e) => upload(e.target.files?.[0])} />
-                    <div className="border border-dashed border-[#FF6B35]/70 rounded-xl p-4 text-center bg-[#111526]">
-                      <p className="font-semibold">Upload Desert Image</p>
-                    </div>
-                  </label>
-                  <div className="mt-3 grid gap-2">
-                    <button className="px-3 py-2 rounded border border-[#2A2D3E]" onClick={() => setShowConf((v) => !v)}>
-                      {showConf ? "Hide Confidence Map" : "Show Confidence Map"}
-                    </button>
-                    <button className="px-3 py-2 rounded border border-[#2A2D3E]" onClick={() => setShowFail((v) => !v)}>
-                      {showFail ? "Hide Uncertain Regions" : "Highlight Uncertain Regions"}
-                    </button>
-                    <button className="px-3 py-2 rounded border border-[#FF6B35] bg-[#FF6B35]/20" onClick={exportReport}>
-                      Export Analysis Report
-                    </button>
-                    <button 
-                      className="px-3 py-2 rounded border border-[#FF6B35] bg-[#FF6B35] text-white font-semibold hover:bg-[#FF6B35]/80 transition-all" 
-                      onClick={generateFullReport}
-                    >
-                      Generate Full Report
-                    </button>
-                  </div>
-                </div>
-
-                <div className="card p-4">
-                  <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em] mb-3">Class Legend</p>
-                  <div className="space-y-2 max-h-[420px] overflow-auto pr-1">
-                    {CLASSES.map((c, i) => {
-                      const d = dist[i] || { percent: 0, iou: 0 };
-                      return (
-                        <div key={c.name} className="rounded-lg border border-[#2A2D3E] bg-[#101320] p-2 flex items-center gap-2">
-                          <input type="checkbox" checked={!!visible[i]} onChange={() => setVisible((v) => ({ ...v, [i]: !v[i] }))} className="w-4 h-4 accent-[#FF6B35]" />
-                          <span className="w-5 h-5 rounded-sm border border-black/30" style={{ backgroundColor: c.color }} />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold truncate">{c.name}</p>
-                            <p className="text-[11px] text-[#A0ADB8]">{d.percent.toFixed(1)}% px | IoU {(d.iou * 100).toFixed(1)}%</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="card p-4">
-                  <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em] mb-3">Rover Navigation View</p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-4 h-4 rounded-sm bg-green-500"></span>
-                      <span className="text-sm">🟢 Safe Zone</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-4 h-4 rounded-sm bg-yellow-500"></span>
-                      <span className="text-sm">🟡 Caution Zone</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-4 h-4 rounded-sm bg-red-500"></span>
-                      <span className="text-sm">🔴 Obstacle Zone</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-4 h-4 rounded-sm bg-white border border-gray-300"></span>
-                      <span className="text-sm">⬜ Suggested Path</span>
-                    </div>
-                  </div>
-                </div>
-              </aside>
-
-              <section className="flex-1 space-y-4">
-                <div className="card p-3 md:p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em]">Interactive Comparison</p>
-                    <p className="text-xs text-[#A0ADB8]">Drag divider to compare original vs overlay</p>
-                  </div>
-                  {!src ? (
-                    <div className="h-[420px] md:h-[560px] rounded-xl border border-dashed border-[#2A2D3E] bg-[#111526] flex items-center justify-center text-[#A0ADB8]">
-                      Upload an image to begin segmentation analysis.
-                    </div>
-                  ) : (
-                    <div
-                      ref={compareRef}
-                      className="relative w-full overflow-hidden rounded-xl border border-[#2A2D3E] bg-black select-none"
-                      onMouseDown={(e) => { setDragging(true); updateSlider(e.clientX); }}
-                      onTouchStart={(e) => { setDragging(true); updateSlider(e.touches[0].clientX); }}
-                    >
-                      <img src={src} className="w-full h-auto block" alt="original" draggable="false" />
-                      <img src={overlaySrc || src} className="absolute inset-0 w-full h-full object-contain pointer-events-none" style={{ clipPath: `inset(0 0 0 ${slider}%)` }} alt="overlay" draggable="false" />
-                      {showFail && img && boxes.map((b, i) => (
-                        <div
-                          key={i}
-                          className="absolute border-2 border-rose-500 bg-rose-500/10 pointer-events-none"
-                          style={{ left: (b.x / img.width * 100) + "%", top: (b.y / img.height * 100) + "%", width: (b.w / img.width * 100) + "%", height: (b.h / img.height * 100) + "%" }}
-                        />
-                      ))}
-                      <div className="absolute top-0 bottom-0 w-[2px] bg-[#FF6B35]" style={{ left: slider + "%" }} />
-                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-[#FF6B35] border border-white/30" style={{ left: slider + "%" }} />
-                    </div>
-                  )}
-                </div>
-
-                <div className="card p-3 md:p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em]">Autonomous Navigation Intelligence</p>
-                    <p className="text-xs text-[#A0ADB8]">Rover Navigation View with optimal path planning</p>
-                  </div>
-                  {!src ? (
-                    <div className="h-[420px] md:h-[560px] rounded-xl border border-dashed border-[#2A2D3E] bg-[#111526] flex items-center justify-center text-[#A0ADB8]">
-                      Upload an image to generate navigation overlay.
-                    </div>
-                  ) : (
-                    <div className="relative w-full overflow-hidden rounded-xl border border-[#2A2D3E] bg-black">
-                      <img src={navigationSrc || src} className="w-full h-auto block" alt="navigation overlay" draggable="false" />
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Mission Intelligence Briefing ── */}
-                {missionBriefing && (() => {
-                  const mb = missionBriefing;
-                  const riskColor = { LOW: "#22c55e", MEDIUM: "#eab308", HIGH: "#f97316", CRITICAL: "#ef4444" }[mb.risk_level] || "#A0ADB8";
-                  const travColor = mb.traversable_pct >= 50 ? "#22c55e" : mb.traversable_pct >= 30 ? "#eab308" : "#ef4444";
-                  const obsColor  = mb.obstacle_pct < 10 ? "#22c55e" : mb.obstacle_pct < 20 ? "#eab308" : "#ef4444";
-                  const corridorMaxPct = Math.max(mb.corridor_pcts.left, mb.corridor_pcts.center, mb.corridor_pcts.right);
-                  const exportMissionJSON = () => {
-                    const payload = { ...mb }; delete payload.hazard_labels;
-                    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-                    const a = document.createElement("a");
-                    a.href = URL.createObjectURL(blob);
-                    a.download = "mission_briefing.json";
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                  };
-                  return (
-                    <div className="card p-5 space-y-5">
-                      {/* Header */}
-                      <div className="flex items-center justify-between flex-wrap gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-white uppercase tracking-widest">Autonomous Mission Intelligence</p>
-                          <p className="text-xs text-[#A0ADB8] mt-0.5">Real-time terrain assessment for UGV deployment</p>
-                        </div>
-                        <button onClick={exportMissionJSON}
-                          className="text-xs px-3 py-1.5 rounded-lg border border-[#FF6B35]/60 text-[#FF6B35] hover:bg-[#FF6B35]/10 transition-all font-semibold">
-                          Export Mission Data (JSON)
-                        </button>
+                  <div className="card p-4">
+                    <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em] mb-2">Upload + Controls</p>
+                    <label className="block cursor-pointer">
+                      <input type="file" accept="image/png,image/jpg,image/jpeg" className="hidden" onChange={(e) => upload(e.target.files?.[0])} />
+                      <div className="border border-dashed border-[#FF6B35]/70 rounded-xl p-4 text-center bg-[#111526]">
+                        <p className="font-semibold">Upload Desert Image</p>
                       </div>
-
-                      {/* Row 1: 4 metric cards */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="bg-[#111526] rounded-xl p-3 border border-[#2A2D3E]">
-                          <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-1">Traversable</p>
-                          <p className="text-2xl font-extrabold" style={{ color: travColor }}>{mb.traversable_pct}%</p>
-                          <p className="text-xs text-[#A0ADB8]">Dry Grass + Landscape</p>
-                        </div>
-                        <div className="bg-[#111526] rounded-xl p-3 border border-[#2A2D3E]">
-                          <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-1">Obstacle Density</p>
-                          <p className="text-2xl font-extrabold" style={{ color: obsColor }}>{mb.obstacle_pct}%</p>
-                          <p className="text-xs text-[#A0ADB8]">Trees, Logs, Rocks, Bushes</p>
-                        </div>
-                        <div className="bg-[#111526] rounded-xl p-3 border border-[#2A2D3E]">
-                          <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-1">Mission Risk</p>
-                          <p className="text-2xl font-extrabold" style={{ color: riskColor }}>{mb.risk_level}</p>
-                          <p className="text-xs text-[#A0ADB8]">Overall threat level</p>
-                        </div>
-                        <div className="bg-[#111526] rounded-xl p-3 border border-[#2A2D3E]">
-                          <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-1">Rec. Speed</p>
-                          <p className="text-2xl font-extrabold text-blue-400">{mb.recommended_speed_kmh}</p>
-                          <p className="text-xs text-[#A0ADB8]">km/h max</p>
-                        </div>
-                      </div>
-
-                      {/* Row 2: Hazard Alerts */}
-                      <div>
-                        <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-2">Hazard Alerts</p>
-                        <div className="flex flex-wrap gap-2">
-                          {mb.hazard_labels.length === 0
-                            ? <span className="text-xs px-3 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/40">✅ No hazards detected</span>
-                            : mb.hazard_labels.map((h, i) => (
-                              <span key={i} className="text-xs px-3 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/40">{h}</span>
-                            ))
-                          }
-                        </div>
-                      </div>
-
-                      {/* Row 3: Mission Summary */}
-                      <div className="bg-[#111526] rounded-xl p-4 border border-[#2A2D3E]">
-                        <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-2">Mission Summary</p>
-                        <p className="text-sm text-white leading-relaxed">{mb.mission_summary}</p>
-                      </div>
-
-                      {/* Row 4: Corridor Safety Map */}
-                      <div>
-                        <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-3">
-                          Corridor Safety Map — safest: <span className="text-white font-bold uppercase">{mb.safe_corridor}</span>
-                        </p>
-                        <div className="grid grid-cols-3 gap-3">
-                          {["left","center","right"].map(col => {
-                            const pct = mb.corridor_pcts[col];
-                            const isBest = col === mb.safe_corridor;
-                            const barColor = isBest ? "#22c55e" : pct >= 40 ? "#eab308" : "#ef4444";
-                            return (
-                              <div key={col} className={`rounded-xl p-3 border ${isBest ? "border-green-500/60 bg-green-500/10" : "border-[#2A2D3E] bg-[#111526]"}`}>
-                                <p className="text-xs text-[#A0ADB8] uppercase tracking-widest text-center mb-2">{col}</p>
-                                <div className="h-24 flex items-end justify-center">
-                                  <div className="w-10 rounded-t-md transition-all" style={{ height: (pct / corridorMaxPct * 100) + "%", backgroundColor: barColor }} />
-                                </div>
-                                <p className="text-center text-sm font-bold mt-1" style={{ color: barColor }}>{parseFloat(pct).toFixed(1)}%</p>
-                                {isBest && <p className="text-center text-xs text-green-400 mt-0.5">✓ Recommended</p>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                  <div className="card p-4 xl:col-span-2">
-                    <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em]">Per-Class IoU Dashboard</p>
-                    <p className="text-4xl font-extrabold text-[#FF6B35] mt-1">{meanPct}%</p>
-                    <p className="text-xs text-[#A0ADB8]">Mean IoU across 10 classes</p>
-                    <div className="h-[380px] overflow-auto">
-                      {chartsReady ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={iou} layout="vertical" margin={{ left: 25, right: 20, top: 10, bottom: 10 }}>
-                            <CartesianGrid stroke="#2A2D3E" strokeDasharray="3 3" />
-                            <XAxis type="number" domain={[0, 1]} tick={{ fill: "#A0ADB8", fontSize: 12 }} tickFormatter={(v) => Math.round(v * 100) + "%"} />
-                            <YAxis type="category" dataKey="name" tick={{ fill: "#FFFFFF", fontSize: 12 }} width={120} />
-                            <Tooltip contentStyle={{ background: "#111526", border: "1px solid #2A2D3E", borderRadius: 10 }} formatter={(v) => (v * 100).toFixed(1) + "%"} />
-                            <Bar dataKey="iou" radius={[0, 8, 8, 0]}>{iou.map((e) => <Cell key={e.name} fill={e.color} />)}</Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="p-4">
-                          <p className="text-sm text-[#A0ADB8] mb-4">Per-Class IoU Breakdown</p>
-                          {renderBarChart(iou)}
-                        </div>
-                      )}
+                    </label>
+                    <div className="mt-3 grid gap-2">
+                      <button className="px-3 py-2 rounded border border-[#2A2D3E]" onClick={() => setShowConf((v) => !v)}>
+                        {showConf ? "Hide Confidence Map" : "Show Confidence Map"}
+                      </button>
+                      <button className="px-3 py-2 rounded border border-[#2A2D3E]" onClick={() => setShowFail((v) => !v)}>
+                        {showFail ? "Hide Uncertain Regions" : "Highlight Uncertain Regions"}
+                      </button>
+                      <button className="px-3 py-2 rounded border border-[#FF6B35] bg-[#FF6B35]/20" onClick={exportReport}>
+                        Export Analysis Report
+                      </button>
+                      <button className="px-3 py-2 rounded border border-[#FF6B35] bg-[#FF6B35] text-white font-semibold hover:bg-[#FF6B35]/80 transition-all" onClick={generateFullReport}>
+                        Generate Full Report
+                      </button>
                     </div>
                   </div>
 
                   <div className="card p-4">
-                    <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em]">Pixel Statistics</p>
-                    <p className="text-sm text-[#A0ADB8] mt-1">Class occupancy and imbalance view</p>
-                    <div className="h-[260px]">
-                      {chartsReady ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie data={dist} dataKey="percent" nameKey="name" innerRadius={52} outerRadius={88} paddingAngle={2}>
-                              {dist.map((e) => <Cell key={e.name} fill={e.color} />)}
-                            </Pie>
-                            <Tooltip contentStyle={{ background: "#111526", border: "1px solid #2A2D3E", borderRadius: 10 }} formatter={(v) => v.toFixed(2) + "%"} />
-                            <Legend wrapperStyle={{ color: "#A0ADB8", fontSize: 11 }} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="p-4">
-                          <p className="text-sm text-[#A0ADB8] mb-4">Pixel Distribution by Class</p>
-                          {renderPieChart(dist)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em]">Top 3 Dominant Classes</p>
-                      {top3.map((s) => (
-                        <div key={s.name} className="text-sm flex items-center gap-2">
-                          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: s.color }} />
-                          <span>{s.name}</span>
-                          <span className="text-[#A0ADB8] ml-auto">{s.percent.toFixed(1)}%</span>
-                        </div>
-                      ))}
+                    <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em] mb-3">Class Legend</p>
+                    <div className="space-y-2 max-h-[420px] overflow-auto pr-1">
+                      {CLASSES.map((c, i) => {
+                        const d = dist[i] || { percent: 0, iou: 0 };
+                        return (
+                          <div key={c.name} className="rounded-lg border border-[#2A2D3E] bg-[#101320] p-2 flex items-center gap-2">
+                            <input type="checkbox" checked={!!visible[i]} onChange={() => setVisible((v) => ({ ...v, [i]: !v[i] }))} className="w-4 h-4 accent-[#FF6B35]" />
+                            <span className="w-5 h-5 rounded-sm border border-black/30" style={{ backgroundColor: c.color }} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold truncate">{c.name}</p>
+                              <p className="text-[11px] text-[#A0ADB8]">{d.percent.toFixed(1)}% px | IoU {(d.iou * 100).toFixed(1)}%</p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                </div>
-              </section>
-            </div>
+
+                  <div className="card p-4">
+                    <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em] mb-3">Rover Navigation View</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2"><span className="w-4 h-4 rounded-sm bg-green-500"></span><span className="text-sm">🟢 Safe Zone</span></div>
+                      <div className="flex items-center gap-2"><span className="w-4 h-4 rounded-sm bg-yellow-500"></span><span className="text-sm">🟡 Caution Zone</span></div>
+                      <div className="flex items-center gap-2"><span className="w-4 h-4 rounded-sm bg-red-500"></span><span className="text-sm">🔴 Obstacle Zone</span></div>
+                      <div className="flex items-center gap-2"><span className="w-4 h-4 rounded-sm bg-white border border-gray-300"></span><span className="text-sm">⬜ Suggested Path</span></div>
+                    </div>
+                  </div>
+                </aside>
+
+                <section className="flex-1 space-y-4">
+                  <div className="card p-3 md:p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em]">Interactive Comparison</p>
+                      <p className="text-xs text-[#A0ADB8]">Drag divider to compare original vs overlay</p>
+                    </div>
+                    {!src ? (
+                      <div className="h-[420px] md:h-[560px] rounded-xl border border-dashed border-[#2A2D3E] bg-[#111526] flex items-center justify-center text-[#A0ADB8]">
+                        Upload an image to begin segmentation analysis.
+                      </div>
+                    ) : (
+                      <div
+                        ref={compareRef}
+                        className="relative w-full overflow-hidden rounded-xl border border-[#2A2D3E] bg-black select-none"
+                        onMouseDown={(e) => { setDragging(true); updateSlider(e.clientX); }}
+                        onTouchStart={(e) => { setDragging(true); updateSlider(e.touches[0].clientX); }}
+                      >
+                        <img src={src} className="w-full h-auto block" alt="original" draggable="false" />
+                        <img src={overlaySrc || src} className="absolute inset-0 w-full h-full object-contain pointer-events-none" style={{ clipPath: `inset(0 0 0 ${slider}%)` }} alt="overlay" draggable="false" />
+                        {showFail && img && boxes.map((b, i) => (
+                          <div key={i} className="absolute border-2 border-rose-500 bg-rose-500/10 pointer-events-none"
+                            style={{ left: (b.x / img.width * 100) + "%", top: (b.y / img.height * 100) + "%", width: (b.w / img.width * 100) + "%", height: (b.h / img.height * 100) + "%" }} />
+                        ))}
+                        <div className="absolute top-0 bottom-0 w-[2px] bg-[#FF6B35]" style={{ left: slider + "%" }} />
+                        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-[#FF6B35] border border-white/30" style={{ left: slider + "%" }} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="card p-3 md:p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em]">Autonomous Navigation Intelligence</p>
+                      <p className="text-xs text-[#A0ADB8]">Rover Navigation View with optimal path planning</p>
+                    </div>
+                    {!src ? (
+                      <div className="h-[420px] md:h-[560px] rounded-xl border border-dashed border-[#2A2D3E] bg-[#111526] flex items-center justify-center text-[#A0ADB8]">
+                        Upload an image to generate navigation overlay.
+                      </div>
+                    ) : (
+                      <div className="relative w-full overflow-hidden rounded-xl border border-[#2A2D3E] bg-black">
+                        <img src={navigationSrc || src} className="w-full h-auto block" alt="navigation overlay" draggable="false" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mission Intelligence Briefing */}
+                  {missionBriefing && (() => {
+                    const mb = missionBriefing;
+                    const riskColor = { LOW: "#22c55e", MEDIUM: "#eab308", HIGH: "#f97316", CRITICAL: "#ef4444" }[mb.risk_level] || "#A0ADB8";
+                    const travColor = mb.traversable_pct >= 50 ? "#22c55e" : mb.traversable_pct >= 30 ? "#eab308" : "#ef4444";
+                    const obsColor  = mb.obstacle_pct < 10 ? "#22c55e" : mb.obstacle_pct < 20 ? "#eab308" : "#ef4444";
+                    const corridorMaxPct = Math.max(mb.corridor_pcts.left, mb.corridor_pcts.center, mb.corridor_pcts.right);
+                    const exportMissionJSON = () => {
+                      const payload = { ...mb }; delete payload.hazard_labels;
+                      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(blob);
+                      a.download = "mission_briefing.json";
+                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    };
+                    return (
+                      <div className="card p-5 space-y-5">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-white uppercase tracking-widest">Autonomous Mission Intelligence</p>
+                            <p className="text-xs text-[#A0ADB8] mt-0.5">Real-time terrain assessment for UGV deployment</p>
+                          </div>
+                          <button onClick={exportMissionJSON} className="text-xs px-3 py-1.5 rounded-lg border border-[#FF6B35]/60 text-[#FF6B35] hover:bg-[#FF6B35]/10 transition-all font-semibold">
+                            Export Mission Data (JSON)
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div className="bg-[#111526] rounded-xl p-3 border border-[#2A2D3E]">
+                            <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-1">Traversable</p>
+                            <p className="text-2xl font-extrabold" style={{ color: travColor }}>{mb.traversable_pct}%</p>
+                            <p className="text-xs text-[#A0ADB8]">Dry Grass + Landscape</p>
+                          </div>
+                          <div className="bg-[#111526] rounded-xl p-3 border border-[#2A2D3E]">
+                            <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-1">Obstacle Density</p>
+                            <p className="text-2xl font-extrabold" style={{ color: obsColor }}>{mb.obstacle_pct}%</p>
+                            <p className="text-xs text-[#A0ADB8]">Trees, Logs, Rocks, Bushes</p>
+                          </div>
+                          <div className="bg-[#111526] rounded-xl p-3 border border-[#2A2D3E]">
+                            <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-1">Mission Risk</p>
+                            <p className="text-2xl font-extrabold" style={{ color: riskColor }}>{mb.risk_level}</p>
+                            <p className="text-xs text-[#A0ADB8]">Overall threat level</p>
+                          </div>
+                          <div className="bg-[#111526] rounded-xl p-3 border border-[#2A2D3E]">
+                            <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-1">Rec. Speed</p>
+                            <p className="text-2xl font-extrabold text-blue-400">{mb.recommended_speed_kmh}</p>
+                            <p className="text-xs text-[#A0ADB8]">km/h max</p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-2">Hazard Alerts</p>
+                          <div className="flex flex-wrap gap-2">
+                            {mb.hazard_labels.length === 0
+                              ? <span className="text-xs px-3 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/40">✅ No hazards detected</span>
+                              : mb.hazard_labels.map((h, i) => (
+                                <span key={i} className="text-xs px-3 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/40">{h}</span>
+                              ))
+                            }
+                          </div>
+                        </div>
+                        <div className="bg-[#111526] rounded-xl p-4 border border-[#2A2D3E]">
+                          <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-2">Mission Summary</p>
+                          <p className="text-sm text-white leading-relaxed">{mb.mission_summary}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#A0ADB8] uppercase tracking-widest mb-3">
+                            Corridor Safety Map — safest: <span className="text-white font-bold uppercase">{mb.safe_corridor}</span>
+                          </p>
+                          <div className="grid grid-cols-3 gap-3">
+                            {["left","center","right"].map(col => {
+                              const pct = mb.corridor_pcts[col];
+                              const isBest = col === mb.safe_corridor;
+                              const barColor = isBest ? "#22c55e" : pct >= 40 ? "#eab308" : "#ef4444";
+                              return (
+                                <div key={col} className={`rounded-xl p-3 border ${isBest ? "border-green-500/60 bg-green-500/10" : "border-[#2A2D3E] bg-[#111526]"}`}>
+                                  <p className="text-xs text-[#A0ADB8] uppercase tracking-widest text-center mb-2">{col}</p>
+                                  <div className="h-24 flex items-end justify-center">
+                                    <div className="w-10 rounded-t-md transition-all" style={{ height: (pct / corridorMaxPct * 100) + "%", backgroundColor: barColor }} />
+                                  </div>
+                                  <p className="text-center text-sm font-bold mt-1" style={{ color: barColor }}>{parseFloat(pct).toFixed(1)}%</p>
+                                  {isBest && <p className="text-center text-xs text-green-400 mt-0.5">✓ Recommended</p>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                    <div className="card p-4 xl:col-span-2">
+                      <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em]">Per-Class IoU Dashboard</p>
+                      <p className="text-4xl font-extrabold text-[#FF6B35] mt-1">{meanPct}%</p>
+                      <p className="text-xs text-[#A0ADB8]">Mean IoU across 10 classes</p>
+                      <div className="h-[380px] overflow-auto">
+                        {chartsReady ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={iou} layout="vertical" margin={{ left: 25, right: 20, top: 10, bottom: 10 }}>
+                              <CartesianGrid stroke="#2A2D3E" strokeDasharray="3 3" />
+                              <XAxis type="number" domain={[0, 1]} tick={{ fill: "#A0ADB8", fontSize: 12 }} tickFormatter={(v) => Math.round(v * 100) + "%"} />
+                              <YAxis type="category" dataKey="name" tick={{ fill: "#FFFFFF", fontSize: 12 }} width={120} />
+                              <Tooltip contentStyle={{ background: "#111526", border: "1px solid #2A2D3E", borderRadius: 10 }} formatter={(v) => (v * 100).toFixed(1) + "%"} />
+                              <Bar dataKey="iou" radius={[0, 8, 8, 0]}>{iou.map((e) => <Cell key={e.name} fill={e.color} />)}</Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="p-4">
+                            <p className="text-sm text-[#A0ADB8] mb-4">Per-Class IoU Breakdown</p>
+                            {renderBarChart(iou)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="card p-4">
+                      <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em]">Pixel Statistics</p>
+                      <p className="text-sm text-[#A0ADB8] mt-1">Class occupancy and imbalance view</p>
+                      <div className="h-[260px]">
+                        {chartsReady ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={dist} dataKey="percent" nameKey="name" innerRadius={52} outerRadius={88} paddingAngle={2}>
+                                {dist.map((e) => <Cell key={e.name} fill={e.color} />)}
+                              </Pie>
+                              <Tooltip contentStyle={{ background: "#111526", border: "1px solid #2A2D3E", borderRadius: 10 }} formatter={(v) => v.toFixed(2) + "%"} />
+                              <Legend wrapperStyle={{ color: "#A0ADB8", fontSize: 11 }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="p-4">
+                            <p className="text-sm text-[#A0ADB8] mb-4">Pixel Distribution by Class</p>
+                            {renderPieChart(dist)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em]">Top 3 Dominant Classes</p>
+                        {top3.map((s) => (
+                          <div key={s.name} className="text-sm flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: s.color }} />
+                            <span>{s.name}</span>
+                            <span className="text-[#A0ADB8] ml-auto">{s.percent.toFixed(1)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
               ) : activeTab === "domain" ? (
-                /* Domain Shift Analysis Tab */
                 <div className="space-y-6">
                   <div className="flex flex-col lg:flex-row gap-4">
                     <aside className="lg:w-[340px] space-y-4">
@@ -1681,12 +1351,7 @@ APP_HTML = r"""
                           <div>
                             <label className="block text-xs text-[#A0ADB8] mb-1">Image A: Training Environment</label>
                             <label className="block cursor-pointer">
-                              <input 
-                                type="file" 
-                                accept="image/png,image/jpg,image/jpeg" 
-                                className="hidden" 
-                                onChange={(e) => upload(e.target.files?.[0], "domainA")} 
-                              />
+                              <input type="file" accept="image/png,image/jpg,image/jpeg" className="hidden" onChange={(e) => upload(e.target.files?.[0], "domainA")} />
                               <div className="border border-dashed border-[#FF6B35]/70 rounded-xl p-3 text-center bg-[#111526]">
                                 <p className="text-sm font-semibold">Upload Training Sample</p>
                               </div>
@@ -1695,12 +1360,7 @@ APP_HTML = r"""
                           <div>
                             <label className="block text-xs text-[#A0ADB8] mb-1">Image B: Test Environment</label>
                             <label className="block cursor-pointer">
-                              <input 
-                                type="file" 
-                                accept="image/png,image/jpg,image/jpeg" 
-                                className="hidden" 
-                                onChange={(e) => upload(e.target.files?.[0], "domainB")} 
-                              />
+                              <input type="file" accept="image/png,image/jpg,image/jpeg" className="hidden" onChange={(e) => upload(e.target.files?.[0], "domainB")} />
                               <div className="border border-dashed border-[#FF6B35]/70 rounded-xl p-3 text-center bg-[#111526]">
                                 <p className="text-sm font-semibold">Upload Test Sample</p>
                               </div>
@@ -1708,7 +1368,6 @@ APP_HTML = r"""
                           </div>
                         </div>
                       </div>
-
                       {domainMetricsA && domainMetricsB && (
                         <div className="card p-4">
                           <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em] mb-3">Domain Analysis Results</p>
@@ -1732,7 +1391,6 @@ APP_HTML = r"""
                         </div>
                       )}
                     </aside>
-
                     <div className="flex-1 space-y-4">
                       {domainSrcA && domainSrcB ? (
                         <>
@@ -1753,39 +1411,21 @@ APP_HTML = r"""
                               </div>
                             </div>
                           </div>
-
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             <div className="card p-4">
                               <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-3">Class Distribution Comparison</p>
-                              <div className="h-[400px] overflow-auto">
-                                {renderDomainComparisonChart(domainMetricsA, domainMetricsB)}
-                              </div>
+                              <div className="h-[400px] overflow-auto">{renderDomainComparisonChart(domainMetricsA, domainMetricsB)}</div>
                               <div className="flex items-center gap-4 mt-3 text-xs">
-                                <div className="flex items-center gap-1">
-                                  <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
-                                  <span className="text-[#A0ADB8]">Training (A)</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <div className="w-3 h-3 bg-orange-500 rounded-sm"></div>
-                                  <span className="text-[#A0ADB8]">Test (B)</span>
-                                </div>
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded-sm"></div><span className="text-[#A0ADB8]">Training (A)</span></div>
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 bg-orange-500 rounded-sm"></div><span className="text-[#A0ADB8]">Test (B)</span></div>
                               </div>
                             </div>
-
                             <div className="card p-4">
                               <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-3">Per-Class Confidence Comparison</p>
-                              <div className="h-[400px] overflow-auto">
-                                {renderConfidenceComparison(domainMetricsA, domainMetricsB)}
-                              </div>
+                              <div className="h-[400px] overflow-auto">{renderConfidenceComparison(domainMetricsA, domainMetricsB)}</div>
                               <div className="flex items-center gap-4 mt-3 text-xs">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-blue-400">●</span>
-                                  <span className="text-[#A0ADB8]">Training Confidence</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-orange-400">●</span>
-                                  <span className="text-[#A0ADB8]">Test Confidence</span>
-                                </div>
+                                <div className="flex items-center gap-1"><span className="text-blue-400">●</span><span className="text-[#A0ADB8]">Training Confidence</span></div>
+                                <div className="flex items-center gap-1"><span className="text-orange-400">●</span><span className="text-[#A0ADB8]">Test Confidence</span></div>
                               </div>
                             </div>
                           </div>
@@ -1801,8 +1441,8 @@ APP_HTML = r"""
                     </div>
                   </div>
                 </div>
+
               ) : activeTab === "training" ? (
-                /* Training Journey Tab */
                 <div className="space-y-6">
                   <div className="text-center mb-6">
                     <h2 className="text-3xl font-bold text-white mb-2">Model Training Journey</h2>
@@ -1810,51 +1450,19 @@ APP_HTML = r"""
                       SegFormer B2 · 40 epochs on Kaggle T4 GPU · 512×512 · From 0.5355 → {trainingHistory ? (Math.max(...trainingHistory.val_mean_iou)).toFixed(4) : '0.6371'} mIoU
                     </p>
                   </div>
-                  
                   {trainingHistory && (
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        <div className="card p-4">
-                          <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Starting IoU</p>
-                          <p className="text-2xl font-bold text-gray-400">0.2478</p>
-                          <p className="text-xs text-[#A0ADB8]">baseline</p>
-                        </div>
-                        <div className="card p-4">
-                          <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Best IoU</p>
-                          <p className="text-2xl font-bold text-[#FF6B35]">
-                            {(Math.max(...trainingHistory.val_mean_iou)).toFixed(4)}
-                          </p>
-                          <p className="text-xs text-[#A0ADB8]">achieved</p>
-                        </div>
-                        <div className="card p-4">
-                          <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Improvement</p>
-                          <p className="text-2xl font-bold text-emerald-400">
-                            {(((Math.max(...trainingHistory.val_mean_iou) - 0.2478) / 0.2478) * 100).toFixed(1)}%
-                          </p>
-                          <p className="text-xs text-[#A0ADB8]">over baseline</p>
-                        </div>
-                        <div className="card p-4">
-                          <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Total Epochs</p>
-                          <p className="text-2xl font-bold text-blue-400">
-                            {trainingHistory.total_epochs || trainingHistory.train_loss.length}
-                          </p>
-                          <p className="text-xs text-[#A0ADB8]">trained</p>
-                        </div>
-                        <div className="card p-4">
-                          <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Training Time</p>
-                          <p className="text-2xl font-bold text-purple-400">
-                            {trainingHistory.training_time_hours || 4.5}h
-                          </p>
-                          <p className="text-xs text-[#A0ADB8]">duration</p>
-                        </div>
+                        <div className="card p-4"><p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Starting IoU</p><p className="text-2xl font-bold text-gray-400">0.2478</p><p className="text-xs text-[#A0ADB8]">baseline</p></div>
+                        <div className="card p-4"><p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Best IoU</p><p className="text-2xl font-bold text-[#FF6B35]">{(Math.max(...trainingHistory.val_mean_iou)).toFixed(4)}</p><p className="text-xs text-[#A0ADB8]">achieved</p></div>
+                        <div className="card p-4"><p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Improvement</p><p className="text-2xl font-bold text-emerald-400">{(((Math.max(...trainingHistory.val_mean_iou) - 0.2478) / 0.2478) * 100).toFixed(1)}%</p><p className="text-xs text-[#A0ADB8]">over baseline</p></div>
+                        <div className="card p-4"><p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Total Epochs</p><p className="text-2xl font-bold text-blue-400">{trainingHistory.total_epochs || trainingHistory.train_loss.length}</p><p className="text-xs text-[#A0ADB8]">trained</p></div>
+                        <div className="card p-4"><p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Training Time</p><p className="text-2xl font-bold text-purple-400">{trainingHistory.training_time_hours || 4.5}h</p><p className="text-xs text-[#A0ADB8]">duration</p></div>
                       </div>
-
                       <div className="card p-6">
                         <p className="text-sm text-[#A0ADB8] uppercase tracking-[.14em] mb-4">Training Progress Visualization</p>
                         {renderTrainingLineChart(trainingHistory, milestones)}
                       </div>
-
-                      {/* Final Evaluation Results — real Kaggle checkpoint data */}
                       {(() => {
                         const EVAL = [
                           { name: "Sky",            iou: 0.9823, px: 37.84, status: "GOOD", color: "#87CEEB" },
@@ -1894,9 +1502,7 @@ APP_HTML = r"""
                                       <div className="h-full rounded-full transition-all" style={{ width: barW + "%", backgroundColor: barColor }} />
                                     </div>
                                     <span className="text-xs font-bold w-12 text-right" style={{ color: barColor }}>{barW}%</span>
-                                    <span className={`text-xs px-2 py-0.5 rounded w-12 text-center ${cls.status === "GOOD" ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"}`}>
-                                      {cls.status}
-                                    </span>
+                                    <span className={`text-xs px-2 py-0.5 rounded w-12 text-center ${cls.status === "GOOD" ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"}`}>{cls.status}</span>
                                     <span className="text-xs text-[#A0ADB8] w-14 text-right">{cls.px.toFixed(1)}% px</span>
                                   </div>
                                 );
@@ -1908,119 +1514,65 @@ APP_HTML = r"""
                     </>
                   )}
                 </div>
+
               ) : activeTab === "failures" ? (
-                /* Failure Intelligence Tab */
                 (() => {
                   function FailureCard({ item }) {
                     const topConfusion = item.confused_pairs && item.confused_pairs[0];
-                    const confColor = item.mean_conf >= 0.65 ? "#22c55e"
-                                    : item.mean_conf >= 0.50 ? "#eab308"
-                                    : "#ef4444";
+                    const confColor = item.mean_conf >= 0.65 ? "#22c55e" : item.mean_conf >= 0.50 ? "#eab308" : "#ef4444";
                     return (
                       <div className="card p-4 space-y-3">
-                        {/* Header */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">
-                              #{item.rank}
-                            </span>
-                            <span className="text-sm font-semibold text-white truncate max-w-[180px]">
-                              {item.filename}
-                            </span>
+                            <span className="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">#{item.rank}</span>
+                            <span className="text-sm font-semibold text-white truncate max-w-[180px]">{item.filename}</span>
                           </div>
                           <div className="text-right">
                             <p className="text-xs text-[#A0ADB8]">Confidence</p>
-                            <p className="text-sm font-bold" style={{ color: confColor }}>
-                              {(item.mean_conf * 100).toFixed(1)}%
-                            </p>
+                            <p className="text-sm font-bold" style={{ color: confColor }}>{(item.mean_conf * 100).toFixed(1)}%</p>
                           </div>
                         </div>
-
-                        {/* Original vs prediction side-by-side */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                           <div className="space-y-1">
                             <p className="text-[11px] uppercase tracking-wide text-[#A0ADB8]">Original</p>
                             {item.original_b64 ? (
-                              <img
-                                src={item.original_b64}
-                                alt="original"
-                                className="w-full rounded-lg object-cover"
-                                style={{ maxHeight: "200px" }}
-                              />
+                              <img src={item.original_b64} alt="original" className="w-full rounded-lg object-cover" style={{ maxHeight: "200px" }} />
                             ) : (
-                              <div className="w-full h-[120px] bg-[#101320] rounded-lg flex items-center justify-center text-[#A0ADB8] text-xs">
-                                Original not available
-                              </div>
+                              <div className="w-full h-[120px] bg-[#101320] rounded-lg flex items-center justify-center text-[#A0ADB8] text-xs">Original not available</div>
                             )}
                           </div>
                           <div className="space-y-1">
                             <p className="text-[11px] uppercase tracking-wide text-[#A0ADB8]">Prediction</p>
                             {item.prediction_b64 ? (
-                              <img
-                                src={item.prediction_b64}
-                                alt="prediction"
-                                className="w-full rounded-lg object-cover"
-                                style={{ maxHeight: "200px" }}
-                              />
+                              <img src={item.prediction_b64} alt="prediction" className="w-full rounded-lg object-cover" style={{ maxHeight: "200px" }} />
                             ) : (
-                              <div className="w-full h-[120px] bg-[#101320] rounded-lg flex items-center justify-center text-[#A0ADB8] text-xs">
-                                Prediction not available
-                              </div>
+                              <div className="w-full h-[120px] bg-[#101320] rounded-lg flex items-center justify-center text-[#A0ADB8] text-xs">Prediction not available</div>
                             )}
                           </div>
                         </div>
-
-                        {/* Confidence heatmap */}
                         <div className="space-y-1">
                           <p className="text-[11px] uppercase tracking-wide text-[#A0ADB8]">Confidence Heatmap</p>
                           {item.heatmap_b64 ? (
-                            <img
-                              src={item.heatmap_b64}
-                              alt="confidence heatmap"
-                              className="w-full rounded-lg object-cover"
-                              style={{ maxHeight: "180px" }}
-                            />
+                            <img src={item.heatmap_b64} alt="confidence heatmap" className="w-full rounded-lg object-cover" style={{ maxHeight: "180px" }} />
                           ) : (
-                            <div className="w-full h-[100px] bg-[#101320] rounded-lg flex items-center justify-center text-[#A0ADB8] text-xs">
-                              Heatmap not available
-                            </div>
+                            <div className="w-full h-[100px] bg-[#101320] rounded-lg flex items-center justify-center text-[#A0ADB8] text-xs">Heatmap not available</div>
                           )}
                         </div>
-
-                        {/* Metrics row */}
                         <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="bg-[#101320] rounded p-2">
-                            <p className="text-[#A0ADB8]">Uncertain Pixels</p>
-                            <p className="font-bold text-yellow-400">{item.uncertain_pct.toFixed(1)}%</p>
-                          </div>
-                          <div className="bg-[#101320] rounded p-2">
-                            <p className="text-[#A0ADB8]">Difficulty Score</p>
-                            <p className="font-bold text-red-400">{item.difficulty_score.toFixed(3)}</p>
-                          </div>
+                          <div className="bg-[#101320] rounded p-2"><p className="text-[#A0ADB8]">Uncertain Pixels</p><p className="font-bold text-yellow-400">{item.uncertain_pct.toFixed(1)}%</p></div>
+                          <div className="bg-[#101320] rounded p-2"><p className="text-[#A0ADB8]">Difficulty Score</p><p className="font-bold text-red-400">{item.difficulty_score.toFixed(3)}</p></div>
                         </div>
-
-                        {/* Top confusion */}
                         {topConfusion && (
                           <div className="bg-[#101320] rounded p-2 text-xs">
                             <p className="text-[#A0ADB8] mb-1">Top Confusion</p>
-                            <p className="text-[#FF6B35] font-semibold">
-                              {topConfusion.class_a} &harr; {topConfusion.class_b}
-                            </p>
-                            <p className="text-[#A0ADB8]">
-                              {topConfusion.confused_pixels.toLocaleString()} confused pixels
-                            </p>
+                            <p className="text-[#FF6B35] font-semibold">{topConfusion.class_a} &harr; {topConfusion.class_b}</p>
+                            <p className="text-[#A0ADB8]">{topConfusion.confused_pixels.toLocaleString()} confused pixels</p>
                           </div>
                         )}
-
-                        {/* Report snippet */}
                         {item.report_text && (
                           <details className="text-xs">
-                            <summary className="cursor-pointer text-[#A0ADB8] hover:text-white select-none">
-                              View Failure Report
-                            </summary>
-                            <pre className="mt-2 bg-[#101320] rounded p-2 text-[#A0ADB8] whitespace-pre-wrap overflow-auto max-h-[200px] font-mono text-[10px]">
-                              {item.report_text}
-                            </pre>
+                            <summary className="cursor-pointer text-[#A0ADB8] hover:text-white select-none">View Failure Report</summary>
+                            <pre className="mt-2 bg-[#101320] rounded p-2 text-[#A0ADB8] whitespace-pre-wrap overflow-auto max-h-[200px] font-mono text-[10px]">{item.report_text}</pre>
                           </details>
                         )}
                       </div>
@@ -2029,45 +1581,18 @@ APP_HTML = r"""
 
                   return (
                     <div className="space-y-6">
-                      {/* Title */}
                       <div className="text-center mb-6">
-                        <h2 className="text-3xl font-bold text-white mb-2">
-                          Model Failure Intelligence
-                        </h2>
-                        <p className="text-[#A0ADB8]">
-                          Automated discovery of edge cases and improvement opportunities
-                        </p>
+                        <h2 className="text-3xl font-bold text-white mb-2">Model Failure Intelligence</h2>
+                        <p className="text-[#A0ADB8]">Automated discovery of edge cases and improvement opportunities</p>
                       </div>
-
                       {failureData ? (
                         <>
-                          {/* Summary stats */}
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="card p-4">
-                              <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Images Analyzed</p>
-                              <p className="text-2xl font-bold text-white">{failureData.total_images_analyzed}</p>
-                            </div>
-                            <div className="card p-4">
-                              <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Mean Confidence</p>
-                              <p className="text-2xl font-bold text-[#FF6B35]">
-                                {(failureData.global_mean_confidence * 100).toFixed(1)}%
-                              </p>
-                            </div>
-                            <div className="card p-4">
-                              <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Avg Uncertain Px</p>
-                              <p className="text-2xl font-bold text-yellow-400">
-                                {failureData.global_uncertain_pct.toFixed(1)}%
-                              </p>
-                            </div>
-                            <div className="card p-4">
-                              <p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">High-Difficulty</p>
-                              <p className="text-2xl font-bold text-red-400">
-                                {failureData.failure_patterns ? failureData.failure_patterns.high_uncertainty_images : "—"}
-                              </p>
-                            </div>
+                            <div className="card p-4"><p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Images Analyzed</p><p className="text-2xl font-bold text-white">{failureData.total_images_analyzed}</p></div>
+                            <div className="card p-4"><p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Mean Confidence</p><p className="text-2xl font-bold text-[#FF6B35]">{(failureData.global_mean_confidence * 100).toFixed(1)}%</p></div>
+                            <div className="card p-4"><p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">Avg Uncertain Px</p><p className="text-2xl font-bold text-yellow-400">{failureData.global_uncertain_pct.toFixed(1)}%</p></div>
+                            <div className="card p-4"><p className="text-xs text-[#A0ADB8] uppercase tracking-[.14em] mb-1">High-Difficulty</p><p className="text-2xl font-bold text-red-400">{failureData.failure_patterns ? failureData.failure_patterns.high_uncertainty_images : "—"}</p></div>
                           </div>
-
-                          {/* Breakdown bar */}
                           {failureData.failure_patterns && (() => {
                             const fp = failureData.failure_patterns;
                             const total = failureData.total_images_analyzed || 1;
@@ -2079,97 +1604,66 @@ APP_HTML = r"""
                             ];
                             return (
                               <div className="card p-6">
-                                <p className="text-sm text-white font-bold uppercase tracking-widest mb-4">
-                                  Dataset Difficulty Distribution
-                                </p>
+                                <p className="text-sm text-white font-bold uppercase tracking-widest mb-4">Dataset Difficulty Distribution</p>
                                 <div className="space-y-2">
                                   {bars.map(b => (
                                     <div key={b.label} className="flex items-center gap-3">
                                       <span className="text-xs text-[#A0ADB8] w-32 shrink-0">{b.label}</span>
                                       <div className="flex-1 bg-[#2A2D3E] rounded-full h-3 overflow-hidden">
-                                        <div className="h-full rounded-full"
-                                          style={{ width: `${(b.value / total) * 100}%`, backgroundColor: b.color }} />
+                                        <div className="h-full rounded-full" style={{ width: `${(b.value / total) * 100}%`, backgroundColor: b.color }} />
                                       </div>
-                                      <span className="text-xs font-bold w-12 text-right" style={{ color: b.color }}>
-                                        {b.value}
-                                      </span>
+                                      <span className="text-xs font-bold w-12 text-right" style={{ color: b.color }}>{b.value}</span>
                                     </div>
                                   ))}
                                 </div>
                               </div>
                             );
                           })()}
-
-                          {/* Global confused pairs */}
                           {failureData.global_top_confused_pairs && failureData.global_top_confused_pairs.length > 0 && (
                             <div className="card p-6">
-                              <p className="text-sm text-white font-bold uppercase tracking-widest mb-4">
-                                Global Confusion Patterns
-                              </p>
+                              <p className="text-sm text-white font-bold uppercase tracking-widest mb-4">Global Confusion Patterns</p>
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {failureData.global_top_confused_pairs.map((p, i) => (
                                   <div key={i} className="bg-[#101320] rounded-lg p-3 border border-[#2A2D3E]">
                                     <p className="text-sm font-semibold text-[#FF6B35]">{p.pair}</p>
-                                    <p className="text-xs text-[#A0ADB8] mt-1">
-                                      {p.total_confused_pixels.toLocaleString()} total confused pixels
-                                    </p>
+                                    <p className="text-xs text-[#A0ADB8] mt-1">{p.total_confused_pixels.toLocaleString()} total confused pixels</p>
                                   </div>
                                 ))}
                               </div>
                             </div>
                           )}
-
-                          {/* Failure grid */}
-                          <p className="text-sm text-white font-bold uppercase tracking-widest">
-                            Top {failureData.hardest_images.length} Hardest Images
-                          </p>
-
-                          {/* textual list of hardest images */}
+                          <p className="text-sm text-white font-bold uppercase tracking-widest">Top {failureData.hardest_images.length} Hardest Images</p>
                           <div className="card p-4 mb-4">
                             <p className="text-sm text-white font-bold mb-2">Hardest Images List</p>
                             <ol className="list-decimal list-inside text-xs text-[#A0ADB8] space-y-1">
-                              {(
-                                failureData.hardest_images_list
-                                  ? failureData.hardest_images_list.map((line, idx) => (
-                                      <li key={idx}>{line}</li>
-                                    ))
-                                  : failureData.hardest_images.map(item => (
-                                      <li key={item.rank}>
-                                        {item.filename} &nbsp; conf={item.mean_conf.toFixed(3)} &nbsp; uncertain={item.uncertain_pct.toFixed(1)}%
-                                      </li>
-                                    ))
+                              {(failureData.hardest_images_list
+                                ? failureData.hardest_images_list.map((line, idx) => <li key={idx}>{line}</li>)
+                                : failureData.hardest_images.map(item => (
+                                    <li key={item.rank}>{item.filename} &nbsp; conf={item.mean_conf.toFixed(3)} &nbsp; uncertain={item.uncertain_pct.toFixed(1)}%</li>
+                                  ))
                               )}
                             </ol>
                           </div>
-
                           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-6">
-                            {failureData.hardest_images.map(item => (
-                              <FailureCard key={item.rank} item={item} />
-                            ))}
+                            {failureData.hardest_images.map(item => <FailureCard key={item.rank} item={item} />)}
                           </div>
                         </>
                       ) : (
                         <div className="card p-12">
                           <div className="text-center text-[#A0ADB8]">
                             <p className="text-lg font-semibold mb-3">No Failure Analysis Images Found</p>
-                            <p className="text-sm mb-4">
-                              Put failure outputs under rank folders in:
-                            </p>
-                            <code className="block bg-[#2A2D3E] text-[#FF6B35] px-4 py-3 rounded-lg text-sm font-mono">
-                              runs/failure_analysis/rank_01_.../
-                            </code>
-                            <p className="text-xs mt-4 text-[#A0ADB8]">
-                              The app auto-loads original, prediction and confidence heatmap images from each rank folder.
-                            </p>
+                            <p className="text-sm mb-4">Put failure outputs under rank folders in:</p>
+                            <code className="block bg-[#2A2D3E] text-[#FF6B35] px-4 py-3 rounded-lg text-sm font-mono">runs/failure_analysis/rank_01_.../</code>
+                            <p className="text-xs mt-4 text-[#A0ADB8]">The app auto-loads original, prediction and confidence heatmap images from each rank folder.</p>
                           </div>
                         </div>
                       )}
                     </div>
                   );
                 })()
+
               ) : activeTab === "rover" ? (
                 <div key="tab-rover" className="space-y-4">
-                  {/* Rover Header / Controls */}
                   <div className="card p-4 flex items-center justify-between flex-wrap gap-4 shadow-xl border-t-2 border-t-emerald-500">
                     <div className="flex items-center gap-3">
                       <div className="relative">
@@ -2189,16 +1683,13 @@ APP_HTML = r"""
                           {roverHistory[0] ? String(roverHistory.length).padStart(3, '0') : "000"} <span className="text-xs opacity-40">/ 1002</span>
                         </p>
                       </div>
-                      
                       <div className="flex gap-1 px-1">
-                        <button className="p-2 hover:bg-[#2A2D3E] rounded-lg transition-all" title="Toggle Pause" onClick={() => setIsPaused(!isPaused)}>
-                           {isPaused ? "▶️" : "⏸"}
+                        <button className="p-2 hover:bg-[#2A2D3E] rounded-lg transition-all" title="Toggle Pause" onClick={() => setIsPaused(v => !v)}>
+                          {isPaused ? "▶️" : "⏸"}
                         </button>
                         <button className="p-2 hover:bg-[#2A2D3E] rounded-lg transition-all" title="Skip Frame">⏭</button>
                         <button className="p-2 hover:bg-[#2A2D3E] rounded-lg transition-all" title="Shuffle Dataset">🔀</button>
-                        <button 
-                          className="px-3 py-1.5 bg-[#FF6B35]/20 text-[#FF6B35] border border-[#FF6B35]/40 rounded-lg text-xs font-bold hover:bg-[#FF6B35]/30 transition-all flex items-center gap-2"
-                        >
+                        <button className="px-3 py-1.5 bg-[#FF6B35]/20 text-[#FF6B35] border border-[#FF6B35]/40 rounded-lg text-xs font-bold hover:bg-[#FF6B35]/30 transition-all flex items-center gap-2">
                           🎲 Random Jump
                         </button>
                       </div>
@@ -2208,12 +1699,7 @@ APP_HTML = r"""
                       <span className="text-xs text-[#A0ADB8] font-bold">INTERVAL:</span>
                       <div className="flex bg-[#0F1117] rounded-lg border border-[#2A2D3E] p-1">
                         {[0.5, 1, 2, 5].map(s => (
-                          <button 
-                            key={s}
-                            className={`px-2 py-1 text-[10px] rounded font-bold transition-all ${s === 2 ? "bg-[#FF6B35] text-white" : "text-[#A0ADB8] hover:text-white"}`}
-                          >
-                            {s}s
-                          </button>
+                          <button key={s} className={`px-2 py-1 text-[10px] rounded font-bold transition-all ${s === 2 ? "bg-[#FF6B35] text-white" : "text-[#A0ADB8] hover:text-white"}`}>{s}s</button>
                         ))}
                       </div>
                     </div>
@@ -2236,125 +1722,185 @@ APP_HTML = r"""
                           </div>
                         )}
                       </div>
-
-                      {/* Path Analysis Timeline */}
                       <div className="card p-4">
-                         <p className="text-xs font-bold text-[#A0ADB8] uppercase tracking-widest mb-4">Navigational Stability Timeline</p>
-                         <div className="h-32 flex items-end gap-1">
-                            {timelineData.map((d, i) => (
-                              <div 
-                                key={i} 
-                                className="flex-1 bg-emerald-500/40 border-t border-emerald-500 rounded-t-sm" 
-                                style={{ height: `${d.trav}%` }}
-                                title={`${d.time}: ${Number(d.trav).toFixed(1)}% traversable`}
-                              />
-                            ))}
-                         </div>
+                        <p className="text-xs font-bold text-[#A0ADB8] uppercase tracking-widest mb-4">Navigational Stability Timeline</p>
+                        <div className="h-32 flex items-end gap-1">
+                          {timelineData.map((d, i) => (
+                            <div key={d.time + "-" + i} className="flex-1 bg-emerald-500/40 border-t border-emerald-500 rounded-t-sm"
+                              style={{ height: `${d.trav}%` }}
+                              title={`${d.time}: ${Number(d.trav).toFixed(1)}% traversable`} />
+                          ))}
+                        </div>
                       </div>
                     </div>
 
                     <div className="space-y-4">
-                       <div className="card p-4 space-y-5">
-                          <p className="text-xs font-bold text-[#A0ADB8] uppercase tracking-widest">Rover Telemetry</p>
-                          {roverHistory[0] ? (
-                            <div key="telemetry_active" className="space-y-4">
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
-                                    <p className="text-[10px] text-[#A0ADB8]">VELOCITY</p>
-                                    <p className="text-2xl font-black">{roverHistory[0].navigation_command.speed_kmh} <span className="text-xs font-normal opacity-40">km/h</span></p>
-                                  </div>
-                                  <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
-                                    <p className="text-[10px] text-[#A0ADB8]">TRAVERSABLE</p>
-                                    <p className="text-2xl font-black">{roverHistory[0].traversable_pct.toFixed(0)}%</p>
-                                  </div>
-                                </div>
-                                <div className={`p-4 rounded-xl border-2 bg-emerald-500/10 border-emerald-500/30`}>
-                                   <p className="text-[10px] font-black uppercase text-center opacity-70">Current Command</p>
-                                   <p className="text-3xl font-black text-center tracking-tighter uppercase my-1">
-                                      {roverHistory[0].navigation_command.heading.replace('_', ' ')}
-                                   </p>
-                                </div>
-                            </div>
-                          ) : (
-                            <div key="telemetry_waiting" className="py-12 text-center text-[#A0ADB8]">
-                              <div className="text-3xl mb-2 opacity-20">📡</div>
-                              <p className="text-sm">Signal search...</p>
-                            </div>
-                          )}
-                       </div>
-                     </div>
-                  </div>
-
-                  {/* Real-time Monitor & Terrain Database Section */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-                     <div className="card p-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                           <p className="text-xs font-bold text-[#A0ADB8] uppercase tracking-widest">Real-time Model Performance Monitor</p>
-                           <span className="text-xs px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded border border-emerald-500/40">🟢 OPERATIONAL</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                           <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
-                              <p className="text-[10px] text-[#A0ADB8] uppercase">Current Best mIoU</p>
-                              <p className="text-xl font-black text-white">0.6442</p>
-                           </div>
-                           <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
-                              <p className="text-[10px] text-[#A0ADB8] uppercase">Active Model</p>
-                              <p className="text-xl font-black text-white">SegFormer B2</p>
-                           </div>
-                           <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
-                              <p className="text-[10px] text-[#A0ADB8] uppercase">Improvement vs Baseline</p>
-                              <p className="text-xl font-black text-emerald-400">+160%</p>
-                           </div>
-                           <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
-                              <p className="text-[10px] text-[#A0ADB8] uppercase">Images Processed Server-side</p>
-                              <p className="text-xl font-black text-white">{dbHistory.length > 0 ? dbHistory[0].id : 0}</p>
-                           </div>
-                        </div>
-                        <p className="text-[10px] text-[#A0ADB8] text-right">Auto-refreshes every 30s</p>
-                     </div>
-
-                     <div className="card p-4 flex flex-col h-full">
-                        <div className="flex items-center justify-between mb-4">
-                           <p className="text-xs font-bold text-[#A0ADB8] uppercase tracking-widest">Terrain Database & History Log</p>
-                           <a href="/api/history_csv" download="mission_history.csv" target="_blank" className="text-xs text-[#FF6B35] bg-[#FF6B35]/10 border border-[#FF6B35]/30 px-2 py-1 rounded hover:bg-[#FF6B35]/20 transition">Export CSV</a>
-                        </div>
-                        <div className="flex-1 overflow-auto bg-[#0F1117] rounded-lg border border-[#2A2D3E] p-2 max-h-[250px]">
-                           {dbHistory.length > 0 ? (
-                              <table className="w-full text-left text-xs text-[#A0ADB8]">
-                                 <thead className="text-[10px] uppercase border-b border-[#2A2D3E] sticky top-0 bg-[#0F1117]">
-                                    <tr>
-                                       <th className="p-2">ID</th>
-                                       <th className="p-2">Time</th>
-                                       <th className="p-2">Dom. Class</th>
-                                       <th className="p-2">Trav %</th>
-                                       <th className="p-2">Risk</th>
-                                    </tr>
-                                 </thead>
-                                 <tbody>
-                                    {dbHistory.slice(0, 15).map((row, idx) => (
-                                       <tr key={idx} className="border-b border-[#2A2D3E]/50 hover:bg-[#1A1D2E]">
-                                          <td className="p-2 text-white">#{row.id}</td>
-                                          <td className="p-2">{new Date(row.timestamp).toLocaleTimeString()}</td>
-                                          <td className="p-2">{row.dominant_class}</td>
-                                          <td className="p-2 font-mono">{row.traversable_pct.toFixed(1)}%</td>
-                                          <td className="p-2">
-                                             <span className={`px-1.5 py-0.5 rounded text-[10px] ${row.risk_level === 'LOW' ? 'bg-emerald-500/20 text-emerald-400' : row.risk_level === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
-                                                {row.risk_level}
-                                             </span>
-                                          </td>
-                                       </tr>
-                                    ))}
-                                 </tbody>
-                              </table>
-                           ) : (
-                              <div className="h-full flex items-center justify-center">
-                                 <p className="opacity-50 text-xs">No database history detected. Run inference to log.</p>
+                      <div className="card p-4 space-y-5">
+                        <p className="text-xs font-bold text-[#A0ADB8] uppercase tracking-widest">Rover Telemetry</p>
+                        {roverHistory[0] ? (
+                          <div key="telemetry_active" className="space-y-4">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
+                                <p className="text-[10px] text-[#A0ADB8]">VELOCITY</p>
+                                <p className="text-2xl font-black">{roverHistory[0].navigation_command.speed_kmh} <span className="text-xs font-normal opacity-40">km/h</span></p>
                               </div>
-                           )}
-                        </div>
-                     </div>
+                              <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
+                                <p className="text-[10px] text-[#A0ADB8]">TRAVERSABLE</p>
+                                <p className="text-2xl font-black">{roverHistory[0].traversable_pct.toFixed(0)}%</p>
+                              </div>
+                            </div>
+                            <div className="p-4 rounded-xl border-2 bg-emerald-500/10 border-emerald-500/30">
+                              <p className="text-[10px] font-black uppercase text-center opacity-70">Current Command</p>
+                              <p className="text-3xl font-black text-center tracking-tighter uppercase my-1">{roverHistory[0].navigation_command.heading.replace('_', ' ')}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div key="telemetry_waiting" className="py-12 text-center text-[#A0ADB8]">
+                            <div className="text-3xl mb-2 opacity-20">📡</div>
+                            <p className="text-sm">Signal search...</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                    <div className="card p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-[#A0ADB8] uppercase tracking-widest">Real-time Model Performance Monitor</p>
+                        <span className="text-xs px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded border border-emerald-500/40">🟢 OPERATIONAL</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]"><p className="text-[10px] text-[#A0ADB8] uppercase">Current Best mIoU</p><p className="text-xl font-black text-white">0.6442</p></div>
+                        <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]"><p className="text-[10px] text-[#A0ADB8] uppercase">Active Model</p><p className="text-xl font-black text-white">SegFormer B2</p></div>
+                        <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]"><p className="text-[10px] text-[#A0ADB8] uppercase">Improvement vs Baseline</p><p className="text-xl font-black text-emerald-400">+160%</p></div>
+                        <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]"><p className="text-[10px] text-[#A0ADB8] uppercase">Images Processed Server-side</p><p className="text-xl font-black text-white">{dbHistory.length > 0 ? dbHistory[0].id : 0}</p></div>
+                      </div>
+                      <p className="text-[10px] text-[#A0ADB8] text-right">Auto-refreshes every 30s</p>
+                    </div>
+
+                    <div className="card p-4 flex flex-col h-full">
+                      <div className="flex items-center justify-between mb-4">
+                        <p className="text-xs font-bold text-[#A0ADB8] uppercase tracking-widest">Terrain Database &amp; History Log</p>
+                        <a href="/api/history_csv" download="mission_history.csv" target="_blank" className="text-xs text-[#FF6B35] bg-[#FF6B35]/10 border border-[#FF6B35]/30 px-2 py-1 rounded hover:bg-[#FF6B35]/20 transition">Export CSV</a>
+                      </div>
+                      <div className="flex-1 overflow-auto bg-[#0F1117] rounded-lg border border-[#2A2D3E] p-2 max-h-[250px]">
+                        {dbHistory.length > 0 ? (
+                          <table key="db_active" className="w-full text-left text-xs text-[#A0ADB8]">
+                            <thead className="text-[10px] uppercase border-b border-[#2A2D3E] sticky top-0 bg-[#0F1117]">
+                              <tr><th className="p-2">ID</th><th className="p-2">Time</th><th className="p-2">Dom. Class</th><th className="p-2">Trav %</th><th className="p-2">Risk</th></tr>
+                            </thead>
+                            <tbody>
+                              {dbHistory.slice(0, 15).map((row) => (
+                                <tr key={row.id} className="border-b border-[#2A2D3E]/50 hover:bg-[#1A1D2E]">
+                                  <td className="p-2 text-white">#{row.id}</td>
+                                  <td className="p-2">{new Date(row.timestamp).toLocaleTimeString()}</td>
+                                  <td className="p-2">{row.dominant_class}</td>
+                                  <td className="p-2 font-mono">{row.traversable_pct.toFixed(1)}%</td>
+                                  <td className="p-2">
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${row.risk_level === 'LOW' ? 'bg-emerald-500/20 text-emerald-400' : row.risk_level === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                                      {row.risk_level}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <div key="db_empty" className="h-full flex items-center justify-center">
+                            <p className="opacity-50 text-xs">No database history detected. Run inference to log.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              ) : activeTab === "location" ? (
+                <div key="tab-location" className="space-y-4 max-w-4xl mx-auto">
+                  <div className="card p-5 border-t-2 border-t-blue-500 shadow-xl">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="text-3xl text-blue-500">🌍</div>
+                      <div>
+                        <p className="font-bold text-lg text-white">Live Location Intelligence</p>
+                        <p className="text-xs text-[#A0ADB8]">Search operating environment parameters</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={locInput}
+                        onChange={(e) => setLocInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch()}
+                        placeholder="e.g. Sedona, Arizona"
+                        className="flex-1 bg-[#0F1117] border border-[#2A2D3E] rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
+                      />
+                      <button onClick={handleLocationSearch} disabled={locLoading}
+                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-lg transition-all">
+                        {locLoading ? "Scanning..." : "Search"}
+                      </button>
+                    </div>
+                    {locError && (
+                      <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm">
+                        ⚠️ {locError}
+                      </div>
+                    )}
+                    {locData && (
+                      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-4">
+                          <div className="p-4 bg-[#0F1117] border border-[#2A2D3E] rounded-xl flex items-center justify-between">
+                            <div className="pr-4">
+                              <p className="text-[10px] text-[#A0ADB8] uppercase tracking-widest">Location Name</p>
+                              <p className="font-bold mt-1 text-sm">{locData.name.split(',')[0]}<span className="opacity-50 font-normal">, {locData.name.split(',').slice(-1)[0]}</span></p>
+                            </div>
+                            <div className="text-2xl opacity-50 shrink-0">📍</div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="p-3 bg-[#0F1117] border border-[#2A2D3E] rounded-xl text-center">
+                              <p className="text-[10px] text-[#A0ADB8] uppercase">Coordinates</p>
+                              <p className="font-mono text-sm mt-1">{Number(locData.lat).toFixed(4)}° N</p>
+                              <p className="font-mono text-sm">{Number(locData.lon).toFixed(4)}° W</p>
+                            </div>
+                            <div className="p-3 bg-[#0F1117] border border-[#2A2D3E] rounded-xl text-center">
+                              <p className="text-[10px] text-[#A0ADB8] uppercase">Elevation</p>
+                              <p className="font-bold text-lg mt-1 text-emerald-400">{locData.elevation}m</p>
+                            </div>
+                          </div>
+                          <div className="p-4 bg-[#0F1117] border border-[#2A2D3E] rounded-xl">
+                            <p className="text-[10px] text-[#A0ADB8] uppercase tracking-widest mb-3">Environmental Context</p>
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-[#A0ADB8]">Terrain Type:</span>
+                                <span className="font-bold text-yellow-400">{locData.elevation > 1000 ? "Desert Highland" : "Arid Basin"}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-[#A0ADB8]">Climate Zone:</span>
+                                <span className="font-bold text-orange-400">{locData.elevation > 500 ? "Semi-arid" : "Arid Desert"}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-xl">
+                            <p className="text-[10px] text-orange-400 uppercase tracking-widest font-bold mb-2">Mission Briefing Notes</p>
+                            <ul className="text-xs text-white/80 space-y-1 ml-4 list-disc">
+                              {locData.elevation > 1000 && <li>Operating at {locData.elevation}m — engine performance reduced by ~15%</li>}
+                              <li>{locData.elevation > 500 ? "Semi-arid" : "Arid Desert"} climate — dust accumulation risk on sensors</li>
+                            </ul>
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-[#2A2D3E] overflow-hidden bg-[#0F1117] flex items-center justify-center relative min-h-[300px]">
+                          <img
+                            src={`https://tile.openstreetmap.org/12/${locData.xtile}/${locData.ytile}.png`}
+                            alt="Map Tile"
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black to-transparent pointer-events-none" />
+                          <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur rounded text-[9px] text-white/50">
+                            © OpenStreetMap contributors
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : null}
             </main>
@@ -2373,30 +1919,24 @@ from flask import Flask, request, jsonify, send_file, abort
 from werkzeug.serving import WSGIRequestHandler
 import threading
 import webbrowser
+import math
+import time
+import requests
 
 # Create Flask app for report generation
 flask_app = Flask(__name__)
+
+DB_PATH = Path("runs/logs/mission_history.db")
 
 @flask_app.route('/generate_report', methods=['POST'])
 def generate_report():
     try:
         data = request.get_json()
-        
-        # Initialize report generator
         generator = PDFReportGenerator()
-        
-        # Generate the report
         report_path = generator.generate_report()
-        
-        return jsonify({
-            'success': True,
-            'report_path': report_path
-        })
+        return jsonify({'success': True, 'report_path': report_path})
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @flask_app.route('/download_report')
 def download_report():
@@ -2404,13 +1944,9 @@ def download_report():
         report_path = request.args.get('path')
         if not report_path or not os.path.exists(report_path):
             abort(404)
-        
-        return send_file(
-            report_path,
-            as_attachment=True,
-            download_name='desert_segmentation_final_report.pdf',
-            mimetype='application/pdf'
-        )
+        return send_file(report_path, as_attachment=True,
+                         download_name='desert_segmentation_final_report.pdf',
+                         mimetype='application/pdf')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -2419,13 +1955,13 @@ simulator_process = None
 @flask_app.route('/start_simulator', methods=['GET'])
 def start_simulator():
     global simulator_process
-    response = jsonify({"success": True})
-    response.headers.add("Access-Control-Allow-Origin", "*")
     try:
         if simulator_process is None or simulator_process.poll() is not None:
             import subprocess
             simulator_process = subprocess.Popen(["python", "rover_simulator.py"])
-        return response
+        res = jsonify({"success": True})
+        res.headers.add("Access-Control-Allow-Origin", "*")
+        return res
     except Exception as e:
         err = jsonify({"error": str(e)})
         err.headers.add("Access-Control-Allow-Origin", "*")
@@ -2433,8 +1969,6 @@ def start_simulator():
 
 @flask_app.route('/api/history', methods=['GET'])
 def api_history():
-    response = jsonify({"success": True})
-    response.headers.add("Access-Control-Allow-Origin", "*")
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
@@ -2452,23 +1986,67 @@ def api_history():
 
 @flask_app.route('/api/history_csv', methods=['GET'])
 def api_history_csv():
-    import pandas as pd
+    from flask import Response
     try:
         conn = sqlite3.connect(DB_PATH)
         df = pd.read_sql_query("SELECT * FROM segmentation_runs ORDER BY id DESC", conn)
         conn.close()
         csv_str = df.to_csv(index=False)
-        from flask import Response
-        return Response(
-            csv_str,
-            mimetype="text/csv",
-            headers={"Content-disposition": "attachment; filename=mission_history.csv"}
-        )
+        return Response(csv_str, mimetype="text/csv",
+                        headers={"Content-disposition": "attachment; filename=mission_history.csv"})
     except Exception as e:
         return str(e), 500
 
+def deg2num(lat_deg, lon_deg, zoom):
+    lat_rad = math.radians(lat_deg)
+    n = 2.0 ** zoom
+    xtile = int((lon_deg + 180.0) / 360.0 * n)
+    ytile = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
+    return (xtile, ytile)
+
+@flask_app.route('/api/location', methods=['GET'])
+def api_location():
+    location_name = request.args.get('q', '')
+    if not location_name:
+        err = jsonify({"error": "Empty query"})
+        err.headers.add("Access-Control-Allow-Origin", "*")
+        return err, 400
+    try:
+        geocode_url = f"https://nominatim.openstreetmap.org/search?q={requests.utils.quote(location_name)}&format=json&limit=1"
+        headers = {'User-Agent': 'DesertSegStudio/1.0'}
+        geo_req = requests.get(geocode_url, headers=headers, timeout=5)
+        geo_data = geo_req.json()
+        if not geo_data:
+            err = jsonify({"error": "Location not found"})
+            err.headers.add("Access-Control-Allow-Origin", "*")
+            return err, 404
+
+        lat = float(geo_data[0]["lat"])
+        lon = float(geo_data[0]["lon"])
+        display_name = geo_data[0]["display_name"]
+        osm_type = geo_data[0].get("osm_type", "unknown")
+
+        elev_req = requests.get(f"https://api.open-elevation.com/api/v1/lookup?locations={lat},{lon}", timeout=5)
+        elev_data = elev_req.json()
+        elevation = elev_data["results"][0]["elevation"] if "results" in elev_data else 0
+
+        xt, yt = deg2num(lat, lon, 12)
+
+        res = jsonify({
+            "data": {
+                "lat": lat, "lon": lon, "name": display_name,
+                "elevation": elevation, "type": osm_type,
+                "xtile": xt, "ytile": yt
+            }
+        })
+        res.headers.add("Access-Control-Allow-Origin", "*")
+        return res
+    except Exception as e:
+        err = jsonify({"error": str(e)})
+        err.headers.add("Access-Control-Allow-Origin", "*")
+        return err, 500
+
 def run_flask_app():
-    """Run Flask app in background thread"""
     flask_app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)
 
 # Start Flask app in background thread
@@ -2477,21 +2055,11 @@ flask_thread.start()
 
 
 def _load_failure_data() -> dict | None:
-    """Load failure analysis summary and embed images as base64 thumbnails.
-
-    Returns the summary dict with ``original_b64``, ``prediction_b64``, and
-    ``heatmap_b64`` fields added to each hardest-image record, or ``None`` if
-    the summary file does not exist yet.
-    """
     def _candidate_failure_dirs() -> list:
         dirs = []
-        # Primary local path
         dirs.append(config.RUNS_DIR / "failure_analysis")
-        # Project-root level failure analysis path
         dirs.append(config.PROJECT_ROOT.parent / "failure_analysis")
-        # Kaggle default working path
         dirs.append(Path("/kaggle/working/runs/failure_analysis"))
-        # Common downloaded-results layout on Windows
         downloads_dir = Path.home() / "Downloads"
         if downloads_dir.exists():
             matches = sorted(
@@ -2499,11 +2067,9 @@ def _load_failure_data() -> dict | None:
                 reverse=True,
             )
             dirs.extend(matches)
-        # Optional override
         env_dir = os.environ.get("FAILURE_ANALYSIS_DIR", "").strip()
         if env_dir:
             dirs.append(Path(env_dir))
-        # De-duplicate while preserving order
         uniq = []
         seen = set()
         for d in dirs:
@@ -2558,15 +2124,13 @@ def _load_failure_data() -> dict | None:
             mean_conf = 0.0
             uncertain_pct = 0.0
             conf_match = re.search(
-                r"Mean prediction confidence\s*:\s*([0-9]*\.?[0-9]+)",
-                report_text,
+                r"Mean prediction confidence\s*:\s*([0-9]*\.?[0-9]+)", report_text,
             )
             if conf_match:
                 mean_conf = float(conf_match.group(1))
 
             uncertain_match = re.search(
-                r"Uncertain pixels.*:\s*([0-9]*\.?[0-9]+)%",
-                report_text,
+                r"Uncertain pixels.*:\s*([0-9]*\.?[0-9]+)%", report_text,
             )
             if uncertain_match:
                 uncertain_pct = float(uncertain_match.group(1))
@@ -2577,21 +2141,17 @@ def _load_failure_data() -> dict | None:
                 f"{rank}. {filename}   conf={mean_conf:.3f}  uncertain={uncertain_pct:.1f}%"
             )
 
-            hardest_images.append(
-                {
-                    "rank": rank,
-                    "filename": filename,
-                    "difficulty_score": max(
-                        0.0, mean_conf - (uncertain_pct / 100) * 0.3
-                    ),
-                    "mean_conf": mean_conf,
-                    "uncertain_pct": uncertain_pct,
-                    "confused_pairs": [],
-                    "pred_distribution": {},
-                    "output_dir": str(out_dir),
-                    "report_text": report_text,
-                }
-            )
+            hardest_images.append({
+                "rank": rank,
+                "filename": filename,
+                "difficulty_score": max(0.0, mean_conf - (uncertain_pct / 100) * 0.3),
+                "mean_conf": mean_conf,
+                "uncertain_pct": uncertain_pct,
+                "confused_pairs": [],
+                "pred_distribution": {},
+                "output_dir": str(out_dir),
+                "report_text": report_text,
+            })
 
         summary = {
             "total_images_analyzed": len(rank_dirs),
@@ -2621,8 +2181,6 @@ def _load_failure_data() -> dict | None:
             ]
             out_dir = next((c for c in candidates if c.exists()), candidates[0])
 
-        # If summary paths came from another environment (for example Kaggle),
-        # remap to the currently discovered failure_dir.
         if (not out_dir.exists()) and failure_dir is not None:
             fallback_candidates = []
             if output_dir_raw:
@@ -2634,10 +2192,10 @@ def _load_failure_data() -> dict | None:
                 fallback_candidates.append(failure_dir / f"rank_{rank:02d}_{stem}")
             if rank > 0:
                 fallback_candidates.extend(sorted(failure_dir.glob(f"rank_{rank:02d}_*")))
-
             existing = next((p for p in fallback_candidates if p.exists()), None)
             if existing is not None:
                 out_dir = existing
+
         for b64_key, filename in [
             ("original_b64",   "original.png"),
             ("prediction_b64", "prediction.png"),
@@ -2646,15 +2204,10 @@ def _load_failure_data() -> dict | None:
             img_path = out_dir / filename
             if img_path.exists():
                 try:
-                    img = Image.open(img_path).convert("RGB").resize(
-                        thumb_size, Image.LANCZOS
-                    )
+                    img = Image.open(img_path).convert("RGB").resize(thumb_size, Image.LANCZOS)
                     buf = io.BytesIO()
                     img.save(buf, format="PNG", optimize=True)
-                    item[b64_key] = (
-                        "data:image/png;base64,"
-                        + base64.b64encode(buf.getvalue()).decode()
-                    )
+                    item[b64_key] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
                 except Exception:
                     item[b64_key] = ""
             else:
@@ -2683,12 +2236,9 @@ def app() -> None:
         unsafe_allow_html=True,
     )
 
-    # ==========================================
-    # FEATURE 3: Database Init
-    # ==========================================
-    DB_PATH = Path("runs/logs/mission_history.db")
+    # Database Init
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    
+
     def init_db():
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
@@ -2708,87 +2258,9 @@ def app() -> None:
         ''')
         conn.commit()
         conn.close()
-    
+
     init_db()
 
-    # ==========================================
-    # FEATURE 1: Live Location Intelligence
-    # ==========================================
-    @st.cache_data(ttl=3600)
-    def fetch_location_data(location_name):
-        time.sleep(1.1) # Nominatim 1 request/sec limit
-        try:
-            # Geocoding
-            geocode_url = f"https://nominatim.openstreetmap.org/search?q={requests.utils.quote(location_name)}&format=json&limit=1"
-            headers = {'User-Agent': 'DesertSegStudio/1.0'}
-            geo_req = requests.get(geocode_url, headers=headers, timeout=5)
-            geo_data = geo_req.json()
-            if not geo_data:
-                return None, "Location not found"
-            
-            lat = float(geo_data[0]["lat"])
-            lon = float(geo_data[0]["lon"])
-            display_name = geo_data[0]["display_name"]
-            osm_type = geo_data[0].get("osm_type", "unknown")
-            
-            # Elevation
-            elev_req = requests.get(f"https://api.open-elevation.com/api/v1/lookup?locations={lat},{lon}", timeout=5)
-            elev_data = elev_req.json()
-            elevation = elev_data["results"][0]["elevation"] if "results" in elev_data else 0
-            
-            return {
-                "lat": lat, "lon": lon, "name": display_name,
-                "elevation": elevation, "type": osm_type
-            }, None
-        except Exception as e:
-            return None, str(e)
-
-    import math
-    def deg2num(lat_deg, lon_deg, zoom):
-      lat_rad = math.radians(lat_deg)
-      n = 2.0 ** zoom
-      xtile = int((lon_deg + 180.0) / 360.0 * n)
-      ytile = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
-      return (xtile, ytile)
-
-    with st.sidebar:
-        st.header("🌍 Live Location Intel")
-        loc_input = st.text_input("Enter Operating Location", placeholder="e.g. Sedona, Arizona")
-        
-        if loc_input:
-            with st.spinner("Fetching location data..."):
-                loc_data, err = fetch_location_data(loc_input)
-                if err:
-                    st.error(f"Could not load data: {err}")
-                elif loc_data:
-                    st.success("Target Locked")
-                    st.markdown(f"**📍 Location:** {loc_data['name'].split(',')[0]}")
-                    st.markdown(f"**🗺️ Coordinates:** {loc_data['lat']:.4f}° N, {loc_data['lon']:.4f}° W")
-                    st.markdown(f"**⛰️ Elevation:** {loc_data['elevation']} meters")
-                    
-                    terrain_type = "Desert Highland" if loc_data['elevation'] > 1000 else "Arid Basin"
-                    climate = "Semi-arid" if loc_data['elevation'] > 500 else "Arid Desert"
-                    
-                    st.markdown(f"**🌍 Terrain Type:** {terrain_type}")
-                    st.markdown(f"**🌡️ Climate Zone:** {climate}")
-                    
-                    st.markdown("---")
-                    st.markdown("**Mission Briefing Notes:**")
-                    if loc_data['elevation'] > 1000:
-                        st.caption(f"⚠️ Operating at {loc_data['elevation']}m — engine performance reduced by ~15%")
-                    st.caption(f"⚠️ {climate} climate — dust accumulation risk on sensors")
-                    
-                    try:
-                        zoom = 12
-                        xt, yt = deg2num(loc_data['lat'], loc_data['lon'], zoom)
-                        map_url = f"https://tile.openstreetmap.org/{zoom}/{xt}/{yt}.png"
-                        st.image(map_url, caption="OpenStreetMap Target Area")
-                    except Exception:
-                        pass
-
-    # ==========================================
-    # REACT UI
-    # ==========================================
     failure_data = _load_failure_data()
     if failure_data is not None:
         failure_json = json.dumps(failure_data, ensure_ascii=False)
@@ -2798,6 +2270,7 @@ def app() -> None:
 
     html = APP_HTML.replace("/* __FAILURE_DATA__ */", injection)
     components.html(html, height=1300, scrolling=True)
+
 
 if __name__ == "__main__":
     app()

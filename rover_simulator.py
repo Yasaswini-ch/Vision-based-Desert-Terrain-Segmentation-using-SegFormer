@@ -10,7 +10,7 @@ from PIL import Image
 import io
 
 # Config
-SERVER_WS_URL = "ws://localhost:8001/ws/rover"
+SERVER_WS_URL = f"ws://{os.getenv('HOST_IP', '0.0.0.0')}:8001/ws/rover"
 # Exact path from user request
 # Use pathlib for cross-platform backslash handling
 TEST_IMAGES_DIR = Path(r"C:\Opensource\desert segmentation\Offroad_Segmentation_testImages\Color_Images")
