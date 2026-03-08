@@ -813,7 +813,8 @@ APP_HTML = r"""
         useEffect(() => {
           let ws;
           const connect = () => {
-            ws = new WebSocket("ws://localhost:8002/");
+            const host = window.location.hostname || "localhost";
+            ws = new WebSocket(`ws://${host}:8002/`);
             ws.onmessage = (e) => {
               try {
                 const msg = JSON.parse(e.data);
@@ -835,7 +836,8 @@ APP_HTML = r"""
 
         useEffect(() => {
           if (activeTab === "rover") {
-             fetch("http://127.0.0.1:5001/start_simulator")
+             const host = window.location.hostname || "127.0.0.1";
+             fetch(`http://${host}:5001/start_simulator`)
                .catch(err => console.log("Failed to start simulator", err));
           }
         }, [activeTab]);
