@@ -1,0 +1,16 @@
+﻿torch==2.5.1
+torchvision==0.20.1
+albumentations==1.4.24
+opencv-python-headless==4.10.0.84
+numpy==2.4.2
+matplotlib==3.10.1
+scikit-learn==1.6.1
+tqdm==4.67.1
+Pillow==11.1.0
+PyYAML==6.0.3
+scipy==1.17.1
+streamlit==1.49.1
+transformers==4.46.3
+reportlab==3.6.13
+flask==3.0.0
+werkzeug==3.0.0
