@@ -5,7 +5,7 @@
 ![Project Banner](https://img.shields.io/badge/AI-Computer%20Vision-blue?style=for-the-badge&logo=artificial-intelligence)
 ![SegFormer B2](https://img.shields.io/badge/Model-SegFormer%20B2-green?style=for-the-badge&logo=huggingface)
 ![mIoU 0.640](https://img.shields.io/badge/mIoU-0.640-red?style=for-the-badge&logo=target)
-![Training Time](https://img.shields.io/badge/Training-3.5%20hours-orange?style=for-the-badge&logo=clock)
+![Training Time](https://img.shields.io/badge/Training-6%2B%20hours-orange?style=for-the-badge&logo=clock)
 
 **🏆 State-of-the-art semantic segmentation for desert and offroad terrain into 10 classes**
 
@@ -137,7 +137,7 @@ graph TD
 | **Mean IoU** | 0.410 | **0.640** | 🎯 **+24.2%** |
 | **Mean IoU (excl. Sky/Landscape)** | ~0.35 | **0.598** | 📈 **+25.0%** |
 | **Validation Loss** | 1.210 | **1.050** | 📉 **-0.16** |
-| **Training Time** | — | **3.5 hours** | 🕐 40 epochs |
+| **Training Time** | — | **6+ hours** | 🕐 40 epochs |
 
 ### 📋 **Per-Class Performance**
 
