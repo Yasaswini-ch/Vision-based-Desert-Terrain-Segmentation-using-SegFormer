@@ -1,0 +1,61 @@
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large datasets (comment out if you want to include)
+Offroad_Segmentation_Training_Dataset/
+Offroad_Segmentation_testImages/
+
+# Model checkpoints (large files)
+segmentation_project/runs/checkpoints/*.pth
+
+# Logs (can be large)
+segmentation_project/runs/logs/*.png
+segmentation_project/runs/logs/*.json
+
+# Failure analysis (can be regenerated)
+failure_analysis/
+segmentation_project/runs/failure_analysis/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# Test coverage
+.coverage
+htmlcov/
+
+# Node modules (if any)
+node_modules/
+
+# Environment files
+.env
+.env.local
