@@ -5,7 +5,7 @@
 ![Project Banner](https://img.shields.io/badge/AI-Computer%20Vision-blue?style=for-the-badge&logo=artificial-intelligence)
 ![SegFormer B2](https://img.shields.io/badge/Model-SegFormer%20B2-green?style=for-the-badge&logo=huggingface)
 ![mIoU 0.640](https://img.shields.io/badge/mIoU-0.640-red?style=for-the-badge&logo=target)
-![Training Time](https://img.shields.io/badge/Training-6%2B%20hours-orange?style=for-the-badge&logo=clock)
+![Training Time](https://img.shields.io/badge/Training-3.5%20hours-orange?style=for-the-badge&logo=clock)
 
 **🏆 State-of-the-art semantic segmentation for desert and offroad terrain into 10 classes**
 
@@ -76,7 +76,7 @@ graph TD
 
 ### 📊 **4. Interactive Streamlit Dashboard**
 <div align="center">
-<img src="https://raw.githubusercontent.com/Yasaswini-ch/desert-segmentation-intelligence/main/assets/dashboard_preview.png" alt="Interactive Dashboard" width="600"/>
+<img src="assets/dashboard_preview.png" alt="Interactive Dashboard" width="600"/>
 </div>
 
 - **📈 Training History:** Loss curves and mIoU progression
@@ -118,7 +118,7 @@ graph TD
 
 ### 🛡️ **10. Navigation Safety Classification**
 <div align="center">
-<img src="https://raw.githubusercontent.com/Yasaswini-ch/desert-segmentation-intelligence/main/assets/safety_overlay.png" alt="Navigation Safety" width="400"/>
+<img src="assets/safety_overlay.png" alt="Navigation Safety" width="400"/>
 </div>
 
 - **🚫 OBSTACLE:** Trees, Lush Bushes, Logs, Rocks (Red)
@@ -137,7 +137,7 @@ graph TD
 | **Mean IoU** | 0.410 | **0.640** | 🎯 **+24.2%** |
 | **Mean IoU (excl. Sky/Landscape)** | ~0.35 | **0.598** | 📈 **+25.0%** |
 | **Validation Loss** | 1.210 | **1.050** | 📉 **-0.16** |
-| **Training Time** | — | **6+ hours** | 🕐 40 epochs |
+| **Training Time** | — | **3.5 hours** | 🕐 40 epochs |
 
 ### 📋 **Per-Class Performance**
 
@@ -156,7 +156,7 @@ graph TD
 
 ### 📈 **Training Convergence**
 <div align="center">
-<img src="https://raw.githubusercontent.com/Yasaswini-ch/desert-segmentation-intelligence/main/assets/training_curves.png" alt="Training Curves" width="600"/>
+<img src="assets/training_curves.png" alt="Training Curves" width="600"/>
 </div>
 
 - **Epoch 1-10:** Rapid improvement (mIoU 0.536 → 0.607)
@@ -183,7 +183,7 @@ graph TD
 
 ### 🎯 **Most Challenging Cases**
 <div align="center">
-<img src="https://raw.githubusercontent.com/Yasaswini-ch/desert-segmentation-intelligence/main/assets/failure_analysis.png" alt="Failure Analysis" width="500"/>
+<img src="assets/failure_analysis.png" alt="Failure Analysis" width="500"/>
 </div>
 
 - **🥇 Rank 1:** Image 0000598 (Difficulty: 0.430, Confidence: 0.588)
@@ -310,7 +310,7 @@ desert-segmentation/
 ## 🎨 **Interactive Dashboard**
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/Yasaswini-ch/desert-segmentation-intelligence/main/assets/dashboard_tabs.png" alt="Dashboard Tabs" width="700"/>
+<img src="assets/dashboard_tabs.png" alt="Dashboard Tabs" width="700"/>
 </div>
 
 ### 📈 **Training History Tab**
@@ -517,15 +517,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **🎨 Streamlit:** For the interactive dashboard framework
 - **📊 Albumentations:** For advanced data augmentations
 - **🏆 Duality AI:** For the challenging offroad segmentation dataset
-
----
-
-## 📞 **Support & Contact**
-
-- **🐛 Issues:** [GitHub Issues](https://github.com/your-username/desert-segmentation/issues)
-- **💬 Discussions:** [GitHub Discussions](https://github.com/your-username/desert-segmentation/discussions)
-- **📧 Email:** your.email@example.com
-- **🔗 LinkedIn:** [Your LinkedIn](https://linkedin.com/in/your-profile)
 
 ---
 

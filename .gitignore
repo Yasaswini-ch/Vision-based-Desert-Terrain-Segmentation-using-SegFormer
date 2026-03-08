@@ -56,14 +56,79 @@ segmentation_project/runs/failure_analysis/
 dist/
 build/
 *.egg-info/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Test coverage
-.coverage
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
 htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
 
-# Node modules (if any)
-node_modules/
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.conda/
 
-# Environment files
-.env
-.env.local
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific - Large files and datasets
+runs/checkpoints/*.pth
+runs/predictions/*.png
+runs/uncertainty/*.png
+runs/densecrf/*.png
+# runs/failure_analysis/  # Removed - we want to include failure analysis results
+runs/logs/*.png
+
+# Dataset directories (too large for Git)
+../Offroad_Segmentation_Training_Dataset/
+../Offroad_Segmentation_testImages/
+../dataset/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+logs/
+*.zip
+*.tar.gz
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Streamlit
+.streamlit/secrets.toml

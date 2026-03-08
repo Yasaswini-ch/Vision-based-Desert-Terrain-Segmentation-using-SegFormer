@@ -1,0 +1,41 @@
+FAILURE ANALYSIS REPORT
+==================================================
+Image: 0000313.png
+
+METRICS
+  Mean prediction confidence : 0.5969  (59.7%)
+  Uncertain pixels (conf<0.6) : 47.7%
+
+WHY THE MODEL STRUGGLED HERE
+  - Very high proportion of uncertain regions (>40%), suggesting
+    the scene contains visual patterns poorly represented in training.
+
+CONFUSED CLASS PAIRS (top confusions)
+  - Dry Grass          <-> Landscape          : 23,591 pixels
+  - Ground Clutter     <-> Landscape          : 9,797 pixels
+  - Dry Grass          <-> Ground Clutter     : 6,673 pixels
+  - Dry Bushes         <-> Landscape          : 6,172 pixels
+  - Lush Bushes        <-> Landscape          : 2,151 pixels
+
+  Primary confusion: Dry Grass vs Landscape
+  (Dry-terrain classes share similar warm, earthy tones.)
+  (Open landscape can resemble dry grass at distance.)
+
+PREDICTED CLASS DISTRIBUTION (top 5)
+  Dry Grass           :  30.0%  ###############
+  Landscape           :  27.9%  #############
+  Sky                 :  17.0%  ########
+  Ground Clutter      :  15.4%  #######
+  Dry Bushes          :   7.2%  ###
+
+SUGGESTED FIX
+  1. Collect more training samples that show Dry Grass and Landscape under
+     similar lighting and texture conditions to improve discrimination.
+  2. Apply stronger colour-jitter and brightness augmentation so the
+     model learns shape and texture cues rather than colour alone.
+  3. Add test-time augmentation (TTA) or CRF post-processing to
+     sharpen predictions in high-uncertainty regions.
+  4. Review per-class loss weights — underrepresented or confused classes
+     may need higher weight to receive stronger training signal.
+  5. Consider adding hard-example mining so the training loop focuses
+     more epochs on scenes similar to this one.
