@@ -118,7 +118,7 @@ graph TD
 
 ### 🛡️ **10. Navigation Safety Classification**
 <div align="center">
-<img src="assets/safety_overlay.png" alt="Navigation Safety" width="400"/>
+<img src="assets/Screenshot 2026-03-08 173920.png" alt="Navigation Safety" width="400"/>
 </div>
 
 - **🚫 OBSTACLE:** Trees, Lush Bushes, Logs, Rocks (Red)
@@ -156,7 +156,7 @@ graph TD
 
 ### 📈 **Training Convergence**
 <div align="center">
-<img src="assets/training_curves.png" alt="Training Curves" width="600"/>
+<img src="assets/Screenshot 2026-03-08 173956.png" alt="Training Curves" width="600"/>
 </div>
 
 - **Epoch 1-10:** Rapid improvement (mIoU 0.536 → 0.607)
@@ -183,7 +183,7 @@ graph TD
 
 ### 🎯 **Most Challenging Cases**
 <div align="center">
-<img src="assets/failure_analysis.png" alt="Failure Analysis" width="500"/>
+<img src="assets/Screenshot 2026-03-08 174024.png" alt="Failure Analysis" width="500"/>
 </div>
 
 - **🥇 Rank 1:** Image 0000598 (Difficulty: 0.430, Confidence: 0.588)
@@ -310,7 +310,7 @@ desert-segmentation/
 ## 🎨 **Interactive Dashboard**
 
 <div align="center">
-<img src="assets/dashboard_tabs.png" alt="Dashboard Tabs" width="700"/>
+<img src="assets/Screenshot 2026-03-08 174049.png" alt="Dashboard Tabs" width="700"/>
 </div>
 
 ### 📈 **Training History Tab**
