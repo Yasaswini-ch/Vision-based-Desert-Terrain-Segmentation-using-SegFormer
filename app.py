@@ -808,6 +808,7 @@ APP_HTML = r"""
         const [roverHistory, setRoverHistory] = useState([]);
         const [isPaused, setIsPaused] = useState(false);
         const [timelineData, setTimelineData] = useState([]);
+        const [dbHistory, setDbHistory] = useState([]);
 
         // WebSocket for Live Rover Feed
         useEffect(() => {
@@ -839,6 +840,16 @@ APP_HTML = r"""
              const host = window.location.hostname || "127.0.0.1";
              fetch(`http://${host}:5001/start_simulator`)
                .catch(err => console.log("Failed to start simulator", err));
+               
+             const fetchHistory = () => {
+                 fetch(`http://${host}:5001/api/history`)
+                   .then(res => res.json())
+                   .then(data => { if (data && data.data) setDbHistory(data.data); })
+                   .catch(e => console.log("DB fetch fail", e));
+             };
+             fetchHistory();
+             const interval = setInterval(fetchHistory, 30000);
+             return () => clearInterval(interval);
           }
         }, [activeTab]);
 
@@ -2271,8 +2282,79 @@ APP_HTML = r"""
                             </div>
                           )}
                        </div>
-                    </div>
+                     </div>
                   </div>
+
+                  {/* Real-time Monitor & Terrain Database Section */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                     <div className="card p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                           <p className="text-xs font-bold text-[#A0ADB8] uppercase tracking-widest">Real-time Model Performance Monitor</p>
+                           <span className="text-xs px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded border border-emerald-500/40">🟢 OPERATIONAL</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                           <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
+                              <p className="text-[10px] text-[#A0ADB8] uppercase">Current Best mIoU</p>
+                              <p className="text-xl font-black text-white">0.6442</p>
+                           </div>
+                           <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
+                              <p className="text-[10px] text-[#A0ADB8] uppercase">Active Model</p>
+                              <p className="text-xl font-black text-white">SegFormer B2</p>
+                           </div>
+                           <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
+                              <p className="text-[10px] text-[#A0ADB8] uppercase">Improvement vs Baseline</p>
+                              <p className="text-xl font-black text-emerald-400">+160%</p>
+                           </div>
+                           <div className="bg-[#0F1117] p-3 rounded-lg border border-[#2A2D3E]">
+                              <p className="text-[10px] text-[#A0ADB8] uppercase">Images Processed Server-side</p>
+                              <p className="text-xl font-black text-white">{dbHistory.length > 0 ? dbHistory[0].id : 0}</p>
+                           </div>
+                        </div>
+                        <p className="text-[10px] text-[#A0ADB8] text-right">Auto-refreshes every 30s</p>
+                     </div>
+
+                     <div className="card p-4 flex flex-col h-full">
+                        <div className="flex items-center justify-between mb-4">
+                           <p className="text-xs font-bold text-[#A0ADB8] uppercase tracking-widest">Terrain Database & History Log</p>
+                           <a href="/api/history_csv" download="mission_history.csv" target="_blank" className="text-xs text-[#FF6B35] bg-[#FF6B35]/10 border border-[#FF6B35]/30 px-2 py-1 rounded hover:bg-[#FF6B35]/20 transition">Export CSV</a>
+                        </div>
+                        <div className="flex-1 overflow-auto bg-[#0F1117] rounded-lg border border-[#2A2D3E] p-2 max-h-[250px]">
+                           {dbHistory.length > 0 ? (
+                              <table className="w-full text-left text-xs text-[#A0ADB8]">
+                                 <thead className="text-[10px] uppercase border-b border-[#2A2D3E] sticky top-0 bg-[#0F1117]">
+                                    <tr>
+                                       <th className="p-2">ID</th>
+                                       <th className="p-2">Time</th>
+                                       <th className="p-2">Dom. Class</th>
+                                       <th className="p-2">Trav %</th>
+                                       <th className="p-2">Risk</th>
+                                    </tr>
+                                 </thead>
+                                 <tbody>
+                                    {dbHistory.slice(0, 15).map((row, idx) => (
+                                       <tr key={idx} className="border-b border-[#2A2D3E]/50 hover:bg-[#1A1D2E]">
+                                          <td className="p-2 text-white">#{row.id}</td>
+                                          <td className="p-2">{new Date(row.timestamp).toLocaleTimeString()}</td>
+                                          <td className="p-2">{row.dominant_class}</td>
+                                          <td className="p-2 font-mono">{row.traversable_pct.toFixed(1)}%</td>
+                                          <td className="p-2">
+                                             <span className={`px-1.5 py-0.5 rounded text-[10px] ${row.risk_level === 'LOW' ? 'bg-emerald-500/20 text-emerald-400' : row.risk_level === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                {row.risk_level}
+                                             </span>
+                                          </td>
+                                       </tr>
+                                    ))}
+                                 </tbody>
+                              </table>
+                           ) : (
+                              <div className="h-full flex items-center justify-center">
+                                 <p className="opacity-50 text-xs">No database history detected. Run inference to log.</p>
+                              </div>
+                           )}
+                        </div>
+                     </div>
+                  </div>
+
                 </div>
               ) : null}
             </main>
@@ -2349,9 +2431,45 @@ def start_simulator():
         err.headers.add("Access-Control-Allow-Origin", "*")
         return err, 500
 
+@flask_app.route('/api/history', methods=['GET'])
+def api_history():
+    response = jsonify({"success": True})
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM segmentation_runs ORDER BY id DESC LIMIT 50")
+        rows = [dict(row) for row in c.fetchall()]
+        conn.close()
+        r = jsonify({"data": rows})
+        r.headers.add("Access-Control-Allow-Origin", "*")
+        return r
+    except Exception as e:
+        err = jsonify({"error": str(e)})
+        err.headers.add("Access-Control-Allow-Origin", "*")
+        return err, 500
+
+@flask_app.route('/api/history_csv', methods=['GET'])
+def api_history_csv():
+    import pandas as pd
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        df = pd.read_sql_query("SELECT * FROM segmentation_runs ORDER BY id DESC", conn)
+        conn.close()
+        csv_str = df.to_csv(index=False)
+        from flask import Response
+        return Response(
+            csv_str,
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=mission_history.csv"}
+        )
+    except Exception as e:
+        return str(e), 500
+
 def run_flask_app():
     """Run Flask app in background thread"""
-    flask_app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
+    flask_app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)
 
 # Start Flask app in background thread
 flask_thread = threading.Thread(target=run_flask_app, daemon=True)
@@ -2679,62 +2797,7 @@ def app() -> None:
         injection = "/* no failure data */"
 
     html = APP_HTML.replace("/* __FAILURE_DATA__ */", injection)
-    components.html(html, height=1200, scrolling=True)
-
-    # ==========================================
-    # NATIVE STREAMLIT FEATURES
-    # ==========================================
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    t1, t2 = st.tabs(["Real-time Model Performance Monitor", "Terrain Database & History Log"])
-    
-    with t2:
-        st.header("Mission History & Database")
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            df = pd.read_sql_query("SELECT * FROM segmentation_runs ORDER BY id DESC", conn)
-            conn.close()
-            
-            if not df.empty:
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Total Images Analyzed", len(df))
-                col2.metric("Average Traversable %", f"{df['traversable_pct'].mean():.1f}%")
-                col3.metric("Avg Processing Time", f"{df['processing_time_ms'].mean():.0f} ms")
-                
-                st.subheader("Recent Runs")
-                st.dataframe(df, use_container_width=True)
-                
-                csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button("Export Mission Log (CSV)", data=csv, file_name="mission_history.csv", mime="text/csv")
-            else:
-                st.info("No mission history found yet. Run segmentation to populate log.")
-        except Exception as e:
-            st.error(f"Failed to load database: {e}")
-
-    with t1:
-        st.header("Real-time Model Performance Monitor")
-        st.markdown("**Status:** 🟢 OPERATIONAL — mIoU: 0.6442")
-        metrics_container = st.empty()
-
-    # Auto-refresh loop
-    while True:
-        with metrics_container.container():
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Current best mIoU", "0.6442")
-            col2.metric("Model", "SegFormer B2")
-            col3.metric("Improvement vs Baseline", "+160%")
-            
-            try:
-                conn = sqlite3.connect(DB_PATH)
-                c = conn.cursor()
-                c.execute("SELECT COUNT(*) FROM segmentation_runs")
-                count = c.fetchone()[0]
-                conn.close()
-                col4.metric("Images Processed Today", count)
-            except Exception:
-                col4.metric("Images Processed Today", 0)
-
-            st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
-        time.sleep(30)
+    components.html(html, height=1300, scrolling=True)
 
 if __name__ == "__main__":
     app()
