@@ -76,7 +76,7 @@ graph TD
 
 ### 📊 **4. Interactive Streamlit Dashboard**
 <div align="center">
-<img src="assets/dashboard_preview.png" alt="Interactive Dashboard" width="600"/>
+<img src="assets/Screenshot 2026-03-08 173837.png" alt="Interactive Dashboard" width="600"/>
 </div>
 
 - **📈 Training History:** Loss curves and mIoU progression
