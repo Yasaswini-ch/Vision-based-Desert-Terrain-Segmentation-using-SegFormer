@@ -641,7 +641,7 @@ APP_HTML = r"""
         const x = c.getContext("2d");
         x.fillStyle = "#0F1117"; x.fillRect(0, 0, 1600, 1040);
         x.fillStyle = "#fff"; x.font = "700 34px Manrope"; x.fillText("Desert Segmentation Studio - Analysis Report", 48, 58);
-        x.fillStyle = "#A0ADB8"; x.font = "500 20px Manrope"; x.fillText("Offroad Autonomy - Duality AI Hackathon", 48, 92);
+        x.fillStyle = "#A0ADB8"; x.font = "500 20px Manrope"; x.fillText("Offroad Autonomy - Elite Coders Hackathon", 48, 92);
         x.fillText("Timestamp: " + new Date().toLocaleString(), 1020, 58);
         x.fillText("Mean IoU: " + (mean * 100).toFixed(1) + "%", 1020, 92);
         x.fillStyle = "#1A1D2E"; x.fillRect(40, 120, 740, 420); x.fillRect(820, 120, 740, 420);
