@@ -1110,7 +1110,7 @@ APP_HTML = r"""
                   </div>
                   <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold">Desert Segmentation Studio</h1>
-                    <p className="text-[#A0ADB8]">Offroad Autonomy - Duality AI Hackathon</p>
+                    <p className="text-[#A0ADB8]">Offroad Autonomy - Elite Coders Hackathon</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
