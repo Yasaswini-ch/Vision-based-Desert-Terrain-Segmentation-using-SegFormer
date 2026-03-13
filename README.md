@@ -552,17 +552,6 @@ pre-commit run --all-files
 ### 📋 **License**
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### 📚 **Citation**
-```bibtex
-@misc{desert-segmentation-2024,
-  title={Desert Offroad Semantic Segmentation with SegFormer B2},
-  author={Your Name},
-  year={2024},
-  publisher={GitHub},
-  url={https://github.com/your-username/desert-segmentation}
-}
-```
-
 ---
 
 ## 🙏 **Acknowledgments**
